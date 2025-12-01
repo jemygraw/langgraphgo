@@ -25,6 +25,8 @@ This directory contains various examples demonstrating the features of LangGraph
 
 ## Human-in-the-loop
 - **[Human Approval](human_in_the_loop/)**: Workflow with interrupts and human approval steps.
+- **[Time Travel](time_travel/)**: Inspecting and modifying state history (GetState/UpdateState).
+- **[Dynamic Interrupt](dynamic_interrupt/)**: Pausing execution from within a node using `graph.Interrupt`.
 
 ## Pre-built Agents
 - **[ReAct Agent](react_agent/)**: Reason and Action agent using tools.

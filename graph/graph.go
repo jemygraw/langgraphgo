@@ -21,7 +21,7 @@ var (
 	ErrNoOutgoingEdge = errors.New("no outgoing edge found for node")
 )
 
-// GraphInterrupt is returned when execution is interrupted by configuration
+// GraphInterrupt is returned when execution is interrupted by configuration or dynamic interrupt
 type GraphInterrupt struct {
 	// Node that caused the interruption
 	Node string
@@ -29,10 +29,24 @@ type GraphInterrupt struct {
 	State interface{}
 	// NextNodes that would have been executed if not interrupted
 	NextNodes []string
+	// InterruptValue is the value provided by the dynamic interrupt (if any)
+	InterruptValue interface{}
 }
 
 func (e *GraphInterrupt) Error() string {
+	if e.InterruptValue != nil {
+		return fmt.Sprintf("graph interrupted at node %s with value: %v", e.Node, e.InterruptValue)
+	}
 	return fmt.Sprintf("graph interrupted at node %s", e.Node)
+}
+
+// Interrupt pauses execution and waits for input.
+// If resuming, it returns the value provided in the resume command.
+func Interrupt(ctx context.Context, value interface{}) (interface{}, error) {
+	if resumeVal := GetResumeValue(ctx); resumeVal != nil {
+		return resumeVal, nil
+	}
+	return nil, &NodeInterrupt{Value: value}
 }
 
 // Node represents a node in the message graph.
@@ -182,6 +196,11 @@ func (r *Runnable) InvokeWithConfig(ctx context.Context, initialState interface{
 		// Inject config into context
 		ctx = WithConfig(ctx, config)
 
+		// Inject ResumeValue
+		if config.ResumeValue != nil {
+			ctx = WithResumeValue(ctx, config.ResumeValue)
+		}
+
 		if len(config.Callbacks) > 0 {
 			serialized := map[string]interface{}{
 				"name": "graph",
@@ -271,6 +290,10 @@ func (r *Runnable) InvokeWithConfig(ctx context.Context, initialState interface{
 				}
 
 				if err != nil {
+					var nodeInterrupt *NodeInterrupt
+					if errors.As(err, &nodeInterrupt) {
+						nodeInterrupt.Node = name
+					}
 					errorsList[index] = fmt.Errorf("error in node %s: %w", name, err)
 					return
 				}
@@ -297,6 +320,17 @@ func (r *Runnable) InvokeWithConfig(ctx context.Context, initialState interface{
 		// Check for errors
 		for _, err := range errorsList {
 			if err != nil {
+				// Check for NodeInterrupt
+				var nodeInterrupt *NodeInterrupt
+				if errors.As(err, &nodeInterrupt) {
+					return state, &GraphInterrupt{
+						Node:           nodeInterrupt.Node,
+						State:          state,
+						InterruptValue: nodeInterrupt.Value,
+						NextNodes:      []string{nodeInterrupt.Node},
+					}
+				}
+
 				// Notify callbacks of error
 				if config != nil && len(config.Callbacks) > 0 {
 					for _, cb := range config.Callbacks {

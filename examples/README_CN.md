@@ -25,6 +25,8 @@
 
 ## 人机交互 (Human-in-the-loop)
 - **[人工审批 (Human Approval)](human_in_the_loop/)**: 包含中断和人工审批步骤的工作流。
+- **[时间旅行 (Time Travel)](time_travel/)**: 检查和修改状态历史 (GetState/UpdateState)。
+- **[动态中断 (Dynamic Interrupt)](dynamic_interrupt/)**: 使用 `graph.Interrupt` 在节点内部暂停执行。
 
 ## 预构建代理 (Pre-built Agents)
 - **[ReAct Agent](react_agent/)**: 使用工具的推理与行动 (Reason and Action) 代理。

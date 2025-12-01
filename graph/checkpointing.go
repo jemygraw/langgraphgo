@@ -384,3 +384,119 @@ func generateExecutionID() string {
 func generateCheckpointID() string {
 	return fmt.Sprintf("checkpoint_%d", time.Now().UnixNano())
 }
+
+// StateSnapshot represents a snapshot of the graph state
+type StateSnapshot struct {
+	Values    interface{}
+	Next      []string
+	Config    Config
+	Metadata  map[string]interface{}
+	CreatedAt time.Time
+	ParentID  string
+}
+
+// GetState retrieves the state for the given config
+func (cr *CheckpointableRunnable) GetState(ctx context.Context, config *Config) (*StateSnapshot, error) {
+	var threadID string
+	var checkpointID string
+
+	if config != nil && config.Configurable != nil {
+		if tid, ok := config.Configurable["thread_id"].(string); ok {
+			threadID = tid
+		}
+		if cid, ok := config.Configurable["checkpoint_id"].(string); ok {
+			checkpointID = cid
+		}
+	}
+
+	// Default to current execution ID if thread_id not provided
+	if threadID == "" {
+		threadID = cr.executionID
+	}
+
+	var checkpoint *Checkpoint
+	var err error
+
+	if checkpointID != "" {
+		checkpoint, err = cr.config.Store.Load(ctx, checkpointID)
+	} else {
+		// Get latest checkpoint for the thread
+		// Note: List returns all checkpoints. We need to find the latest one.
+		// This is inefficient for large histories. Real implementations should have GetLatest.
+		checkpoints, err := cr.config.Store.List(ctx, threadID)
+		if err == nil && len(checkpoints) > 0 {
+			// Assuming List returns in some order, or we sort.
+			// For now, assume the last one is latest (based on implementation of MemoryStore)
+			checkpoint = checkpoints[len(checkpoints)-1]
+		}
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	if checkpoint == nil {
+		return &StateSnapshot{
+			Values: nil,
+			Config: *config,
+		}, nil
+	}
+
+	// Construct snapshot
+	snapshot := &StateSnapshot{
+		Values:    checkpoint.State,
+		CreatedAt: checkpoint.Timestamp,
+		Metadata:  checkpoint.Metadata,
+		Config: Config{
+			Configurable: map[string]interface{}{
+				"thread_id":     threadID,
+				"checkpoint_id": checkpoint.ID,
+			},
+		},
+	}
+
+	// Determine "Next" nodes
+	// This is tricky without re-running the graph logic or storing it in the checkpoint.
+	// For now, we might leave it empty or try to infer it if we stored it.
+	// In the future, Checkpoint should store "Next" nodes.
+
+	return snapshot, nil
+}
+
+// UpdateState updates the state for the given config
+func (cr *CheckpointableRunnable) UpdateState(ctx context.Context, config *Config, values interface{}, asNode string) (*Config, error) {
+	var threadID string
+	if config != nil && config.Configurable != nil {
+		if tid, ok := config.Configurable["thread_id"].(string); ok {
+			threadID = tid
+		}
+	}
+
+	if threadID == "" {
+		threadID = cr.executionID
+	}
+
+	// Create new checkpoint
+	checkpoint := &Checkpoint{
+		ID:        generateCheckpointID(),
+		NodeName:  asNode, // The node that "made" this update
+		State:     values,
+		Timestamp: time.Now(),
+		Version:   1, // Should increment version based on parent
+		Metadata: map[string]interface{}{
+			"execution_id": threadID,
+			"source":       "update_state",
+		},
+	}
+
+	if err := cr.config.Store.Save(ctx, checkpoint); err != nil {
+		return nil, err
+	}
+
+	return &Config{
+		Configurable: map[string]interface{}{
+			"thread_id":     threadID,
+			"checkpoint_id": checkpoint.ID,
+		},
+	}, nil
+}

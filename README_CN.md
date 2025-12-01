@@ -99,6 +99,8 @@ func main() {
 - **[子图](./examples/subgraph/)** - 嵌套图组合
 - **[Swarm](./examples/swarm/)** - 多 Agent 协作
 - **[State Schema](./examples/state_schema/)** - 使用 Reducer 进行复杂状态管理
+- **[Time Travel](./examples/time_travel/)** - 检查和修改状态历史
+- **[Dynamic Interrupt](./examples/dynamic_interrupt/)** - 在节点内部暂停执行
 
 ## 🔧 核心概念
 

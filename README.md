@@ -99,6 +99,8 @@ func main() {
 - **[Subgraphs](./examples/subgraph/)** - Nested graph composition
 - **[Swarm](./examples/swarm/)** - Multi-agent collaboration
 - **[State Schema](./examples/state_schema/)** - Complex state management with Reducers
+- **[Time Travel](./examples/time_travel/)** - Inspect and modify state history
+- **[Dynamic Interrupt](./examples/dynamic_interrupt/)** - Pause execution from within a node
 
 ## 🔧 Key Concepts
 

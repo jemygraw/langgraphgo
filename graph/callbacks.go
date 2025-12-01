@@ -58,6 +58,9 @@ type Config struct {
 
 	// ResumeFrom nodes to start execution from (bypassing entry point)
 	ResumeFrom []string `json:"resume_from"`
+
+	// ResumeValue provides the value to return from an Interrupt() call when resuming
+	ResumeValue interface{} `json:"resume_value"`
 }
 
 // NoOpCallbackHandler provides a no-op implementation of CallbackHandler
