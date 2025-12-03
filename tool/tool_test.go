@@ -155,3 +155,48 @@ func TestBochaSearch_Call(t *testing.T) {
 	assert.Contains(t, result, "URL: http://bocha.example.com")
 	assert.Contains(t, result, "Content: This is bocha content.")
 }
+
+func TestBraveSearch_Interface(t *testing.T) {
+	os.Setenv("BRAVE_API_KEY", "test-key")
+	defer os.Unsetenv("BRAVE_API_KEY")
+
+	tool, err := NewBraveSearch("")
+	require.NoError(t, err)
+	assert.Equal(t, "Brave_Search", tool.Name())
+	assert.NotEmpty(t, tool.Description())
+}
+
+// Helper to mock Brave API
+func mockBraveServer() *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{
+			"web": {
+				"results": [
+					{
+						"title": "Brave Result",
+						"url": "http://brave.example.com",
+						"description": "This is brave content."
+					}
+				]
+			}
+		}`))
+	}))
+}
+
+func TestBraveSearch_Call(t *testing.T) {
+	server := mockBraveServer()
+	defer server.Close()
+
+	os.Setenv("BRAVE_API_KEY", "test-key")
+	defer os.Unsetenv("BRAVE_API_KEY")
+
+	tool, err := NewBraveSearch("", WithBraveBaseURL(server.URL))
+	require.NoError(t, err)
+
+	result, err := tool.Call(context.Background(), "test query")
+	require.NoError(t, err)
+	assert.Contains(t, result, "Title: Brave Result")
+	assert.Contains(t, result, "URL: http://brave.example.com")
+	assert.Contains(t, result, "Description: This is brave content.")
+}
