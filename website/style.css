@@ -56,6 +56,9 @@ header {
 }
 
 .logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     font-size: 1.5rem;
     font-weight: 800;
     background: linear-gradient(135deg, var(--primary-color), #8b5cf6);
@@ -63,6 +66,12 @@ header {
     -webkit-text-fill-color: transparent;
     letter-spacing: -0.02em;
     margin-right: 2rem;
+}
+
+.logo img {
+    height: 20px;
+    max-height: 20px;
+    width: auto;
 }
 
 .nav-links {
