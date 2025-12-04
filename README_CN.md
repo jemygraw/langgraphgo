@@ -1,5 +1,5 @@
 # LangGraphGo
-![](website/images/logo/lango5.png)
+![](https://github.com/smallnest/lango-website/blob/master/images/logo/lango5.png)
 
 > 简称 `lango`, 中文: `懒狗`。 logo是一个可爱的中华田园犬形象
 

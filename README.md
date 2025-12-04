@@ -1,5 +1,5 @@
 # LangGraphGo
-![](website/images/logo/lango5.png)
+![](https://github.com/smallnest/lango-website/blob/master/images/logo/lango5.png)
 
 > Abbreviated as `lango`, 中文: `懒狗`
 
