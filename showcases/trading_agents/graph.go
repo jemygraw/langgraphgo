@@ -22,6 +22,7 @@ type TradingAgentsGraph struct {
 	bearishResearch  *agents.BearishResearcher
 	riskManager      *agents.RiskManager
 	trader           *agents.Trader
+	config           *AgentConfig
 }
 
 // NewTradingAgentsGraph creates a new trading agents graph
@@ -74,6 +75,7 @@ func NewTradingAgentsGraph(config *AgentConfig) (*TradingAgentsGraph, error) {
 		bearishResearch: bearishResearch,
 		riskManager:     riskManager,
 		trader:          trader,
+		config:          config,
 	}
 
 	// Build the graph
@@ -84,12 +86,21 @@ func NewTradingAgentsGraph(config *AgentConfig) (*TradingAgentsGraph, error) {
 	return tg, nil
 }
 
+// logVerbose prints log message only in verbose mode
+func (tg *TradingAgentsGraph) logVerbose(format string, args ...interface{}) {
+	if tg.config.Verbose {
+		fmt.Printf(format, args...)
+	}
+}
+
 // buildGraph constructs the trading agents workflow
 func (tg *TradingAgentsGraph) buildGraph() error {
 	// Data Collection Node
 	tg.workflow.AddNode("data_collection", "Collect market data and news", func(ctx context.Context, state interface{}) (interface{}, error) {
 		s := state.(map[string]interface{})
 		symbol := s["symbol"].(string)
+
+		tg.logVerbose("📊 [DATA COLLECTION] Fetching market data for %s...\n", symbol)
 
 		// Fetch all market data
 		quote, err := tg.marketData.GetQuote(ctx, symbol)
@@ -119,79 +130,94 @@ func (tg *TradingAgentsGraph) buildGraph() error {
 		s["social_sentiment"] = sentimentData
 		s["timestamp"] = time.Now()
 
+		tg.logVerbose("✅ [DATA COLLECTION] Market data collected successfully\n")
+
 		return s, nil
 	})
 
 	// Fundamentals Analyst Node
 	tg.workflow.AddNode("fundamentals_analyst", "Analyze company fundamentals", func(ctx context.Context, state interface{}) (interface{}, error) {
 		s := state.(map[string]interface{})
+		tg.logVerbose("📈 [FUNDAMENTALS ANALYST] Analyzing company fundamentals...\n")
 		report, err := tg.fundamentals.Analyze(ctx, s)
 		if err != nil {
 			return nil, err
 		}
 		s["fundamentals_report"] = report
+		tg.logVerbose("✅ [FUNDAMENTALS ANALYST] Analysis complete\n")
 		return s, nil
 	})
 
 	// Sentiment Analyst Node
 	tg.workflow.AddNode("sentiment_analyst", "Analyze market sentiment", func(ctx context.Context, state interface{}) (interface{}, error) {
 		s := state.(map[string]interface{})
+		tg.logVerbose("💭 [SENTIMENT ANALYST] Analyzing market sentiment...\n")
 		report, err := tg.sentiment.Analyze(ctx, s)
 		if err != nil {
 			return nil, err
 		}
 		s["sentiment_report"] = report
+		tg.logVerbose("✅ [SENTIMENT ANALYST] Analysis complete\n")
 		return s, nil
 	})
 
 	// Technical Analyst Node
 	tg.workflow.AddNode("technical_analyst", "Analyze technical indicators", func(ctx context.Context, state interface{}) (interface{}, error) {
 		s := state.(map[string]interface{})
+		tg.logVerbose("📉 [TECHNICAL ANALYST] Analyzing technical indicators...\n")
 		report, err := tg.technical.Analyze(ctx, s)
 		if err != nil {
 			return nil, err
 		}
 		s["technical_report"] = report
+		tg.logVerbose("✅ [TECHNICAL ANALYST] Analysis complete\n")
 		return s, nil
 	})
 
 	// Bullish Researcher Node
 	tg.workflow.AddNode("bullish_researcher", "Provide bullish perspective", func(ctx context.Context, state interface{}) (interface{}, error) {
 		s := state.(map[string]interface{})
+		tg.logVerbose("🐂 [BULLISH RESEARCHER] Researching bullish perspective...\n")
 		research, err := tg.bullishResearch.Research(ctx, s)
 		if err != nil {
 			return nil, err
 		}
 		s["bullish_research"] = research
+		tg.logVerbose("✅ [BULLISH RESEARCHER] Research complete\n")
 		return s, nil
 	})
 
 	// Bearish Researcher Node
 	tg.workflow.AddNode("bearish_researcher", "Provide bearish perspective", func(ctx context.Context, state interface{}) (interface{}, error) {
 		s := state.(map[string]interface{})
+		tg.logVerbose("🐻 [BEARISH RESEARCHER] Researching bearish perspective...\n")
 		research, err := tg.bearishResearch.Research(ctx, s)
 		if err != nil {
 			return nil, err
 		}
 		s["bearish_research"] = research
+		tg.logVerbose("✅ [BEARISH RESEARCHER] Research complete\n")
 		return s, nil
 	})
 
 	// Risk Manager Node
 	tg.workflow.AddNode("risk_manager", "Assess trading risks", func(ctx context.Context, state interface{}) (interface{}, error) {
 		s := state.(map[string]interface{})
+		tg.logVerbose("⚠️  [RISK MANAGER] Assessing trading risks...\n")
 		analysis, score, err := tg.riskManager.AssessRisk(ctx, s)
 		if err != nil {
 			return nil, err
 		}
 		s["risk_analysis"] = analysis
 		s["risk_score"] = score
+		tg.logVerbose("✅ [RISK MANAGER] Risk assessment complete (score: %.1f/100)\n", score)
 		return s, nil
 	})
 
 	// Trader Decision Node
 	tg.workflow.AddNode("trader", "Make final trading decision", func(ctx context.Context, state interface{}) (interface{}, error) {
 		s := state.(map[string]interface{})
+		tg.logVerbose("💼 [TRADER] Making final trading decision...\n")
 		decision, err := tg.trader.MakeDecision(ctx, s)
 		if err != nil {
 			return nil, err
@@ -201,6 +227,7 @@ func (tg *TradingAgentsGraph) buildGraph() error {
 		for k, v := range decision {
 			s[k] = v
 		}
+		tg.logVerbose("✅ [TRADER] Decision made: %s\n", decision["recommendation"].(string))
 		return s, nil
 	})
 
@@ -238,6 +265,9 @@ func (tg *TradingAgentsGraph) buildGraph() error {
 
 // Analyze executes the full trading analysis pipeline
 func (tg *TradingAgentsGraph) Analyze(ctx context.Context, request AnalysisRequest) (*AnalysisResponse, error) {
+	tg.logVerbose("\n🚀 Starting analysis for %s...\n", request.Symbol)
+	tg.logVerbose("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+
 	// Prepare initial state
 	initialState := map[string]interface{}{
 		"symbol":         request.Symbol,
@@ -258,6 +288,7 @@ func (tg *TradingAgentsGraph) Analyze(ctx context.Context, request AnalysisReque
 	}
 
 	// Execute the graph
+	tg.logVerbose("\n🔄 Executing trading pipeline...\n\n")
 	result, err := tg.runnable.Invoke(ctx, initialState)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute graph: %w", err)
@@ -265,6 +296,8 @@ func (tg *TradingAgentsGraph) Analyze(ctx context.Context, request AnalysisReque
 
 	// Extract result
 	finalState := result.(map[string]interface{})
+	tg.logVerbose("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+	tg.logVerbose("🎯 Analysis complete!\n\n")
 
 	// Build response
 	response := &AnalysisResponse{

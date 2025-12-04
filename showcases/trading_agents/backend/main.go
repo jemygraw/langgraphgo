@@ -107,6 +107,9 @@ func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("\n========================================")
+	log.Printf("📥 Received analysis request from %s", r.RemoteAddr)
+
 	// Parse request
 	var req trading.AnalysisRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -119,7 +122,8 @@ func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("📈 Analyzing %s...", req.Symbol)
+	log.Printf("📈 Starting full analysis for %s (Capital: $%.2f, Risk: %s)",
+		req.Symbol, req.Capital, req.RiskTolerance)
 
 	// Perform analysis
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -134,6 +138,7 @@ func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("✅ Analysis complete for %s: %s (confidence: %.0f%%)",
 		result.Symbol, result.Recommendation, result.Confidence)
+	log.Printf("========================================\n")
 
 	// Return response
 	w.Header().Set("Content-Type", "application/json")
@@ -145,6 +150,9 @@ func (s *Server) handleQuickCheck(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
+	log.Printf("\n========================================")
+	log.Printf("📥 Received quick check request from %s", r.RemoteAddr)
 
 	// Parse request
 	var req trading.AnalysisRequest
@@ -158,7 +166,7 @@ func (s *Server) handleQuickCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("⚡ Quick check for %s...", req.Symbol)
+	log.Printf("⚡ Starting quick check for %s", req.Symbol)
 
 	// Perform analysis
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -170,6 +178,9 @@ func (s *Server) handleQuickCheck(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Quick check failed: %v", err), http.StatusInternalServerError)
 		return
 	}
+
+	log.Printf("✅ Quick check complete for %s: %s", result.Symbol, result.Recommendation)
+	log.Printf("========================================\n")
 
 	// Return simplified response
 	quickResponse := map[string]interface{}{
