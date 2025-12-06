@@ -42,6 +42,9 @@ This directory contains various examples demonstrating the features of LangGraph
 
 ## Programmatic Tool Calling (PTC)
 - **[PTC Basic](ptc_basic/README.md)**: Introduction to Programmatic Tool Calling for reduced latency and token efficiency.
+- **[PTC Simple](ptc_simple/)**: Simple PTC example with calculator and weather tools.
+- **[PTC Expense Analysis](ptc_expense_analysis/)**: Complex expense analysis scenario based on Anthropic's PTC Cookbook.
+- **[PTC + GoSkills](ptc_goskills/README.md)**: Integration of PTC with GoSkills for local tool execution.
 
 ## Memory
 - **[Memory Basic](memory_basic/README.md)**: Basic usage of LangChain memory.

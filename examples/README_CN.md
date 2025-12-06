@@ -40,8 +40,11 @@
 - **[Supervisor](supervisor/README_CN.md)**: 使用 Supervisor 进行多代理编排。
 - **[Swarm](swarm/README_CN.md)**: 使用切换 (handoffs) 的多代理协作.
 
-## 程序化工具调用 (PTC)
+## 程序化工具调用 (PTC - Programmatic Tool Calling)
 - **[PTC Basic](ptc_basic/README_CN.md)**: 程序化工具调用入门，降低延迟和提高 Token 效率。
+- **[PTC Simple](ptc_simple/)**: 简单的 PTC 示例，使用计算器和天气工具。
+- **[PTC Expense Analysis](ptc_expense_analysis/)**: 基于 Anthropic PTC Cookbook 的复杂费用分析场景。
+- **[PTC + GoSkills](ptc_goskills/README.md)**: PTC 与 GoSkills 的集成，实现本地工具执行。
 
 ## Memory (记忆)
 - **[Memory Basic](memory_basic/README_CN.md)**: LangChain Memory 的基本用法。
