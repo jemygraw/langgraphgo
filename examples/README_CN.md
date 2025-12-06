@@ -47,8 +47,11 @@
 - **[PTC + GoSkills](ptc_goskills/README.md)**: PTC 与 GoSkills 的集成，实现本地工具执行。
 
 ## Memory (记忆)
-- **[Memory Basic](memory_basic/README_CN.md)**: LangChain Memory 的基本用法。
-- **[Memory Chatbot](memory_chatbot/README_CN.md)**: 集成 Memory 的聊天机器人。
+- **[Memory Basic](memory_basic/README_CN.md)**: LangChain Memory 适配器的基本用法。
+- **[Memory Chatbot](memory_chatbot/README_CN.md)**: 集成 LangChain Memory 的聊天机器人。
+- **[Memory Strategies](memory_strategies/README_CN.md)**: 全面介绍所有 9 种内存管理策略。
+- **[Memory Agent](memory_agent/README_CN.md)**: 使用不同内存策略进行上下文管理的真实 Agent 示例。
+- **[Memory + Graph 集成](memory_graph_integration/README_CN.md)**: 在 LangGraph 工作流中基于 State 的内存集成。
 
 ## RAG (检索增强生成)
 - **[RAG Basic](rag_basic/README_CN.md)**: 基础 RAG 实现。

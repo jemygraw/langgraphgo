@@ -47,8 +47,11 @@ This directory contains various examples demonstrating the features of LangGraph
 - **[PTC + GoSkills](ptc_goskills/README.md)**: Integration of PTC with GoSkills for local tool execution.
 
 ## Memory
-- **[Memory Basic](memory_basic/README.md)**: Basic usage of LangChain memory.
-- **[Memory Chatbot](memory_chatbot/README.md)**: Chatbot with memory integration.
+- **[Memory Basic](memory_basic/README.md)**: Basic usage of LangChain memory adapters.
+- **[Memory Chatbot](memory_chatbot/README.md)**: Chatbot with LangChain memory integration.
+- **[Memory Strategies](memory_strategies/README.md)**: Comprehensive guide to all 9 memory management strategies.
+- **[Memory Agent](memory_agent/README.md)**: Real-world agents using different memory strategies for context management.
+- **[Memory + Graph Integration](memory_graph_integration/README.md)**: State-based memory integration in LangGraph workflows.
 
 ## RAG (Retrieval Augmented Generation)
 - **[RAG Basic](rag_basic/README.md)**: Basic RAG implementation.
