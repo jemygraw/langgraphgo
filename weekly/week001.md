@@ -478,15 +478,17 @@
 - ✅ PTC 默认执行模式改为 ModeDirect
 - ✅ 完成所有 Showcase 文档整合工作
 - ✅ 发布 v0.5.0 版本
-- ✅ **完善 PTC 的 ModeDirect 实际工具调用** (commit b9c58e9)
-  - ModeDirect 现在通过内部工具服务器真正调用工具
-  - 不再返回占位符字符串
-  - Helper 程序生成真实的 HTTP 客户端代码
-  - 对用户完全透明，自动启动/停止内部服务器
-- ✅ **大幅增加单元测试覆盖率** (commit b9c58e9)
-  - 测试数量：4 个 → 25 个（增长 525%）
-  - 测试覆盖率：66.0%
-  - 新增 21 个综合测试用例
+- ✅ **实现 TRUE ModeDirect 本地工具执行** (commit 665dbc9)
+  - **ModeDirect 模式：完全本地执行，无 HTTP 服务器**
+  - 遵循 goskills 模式：通过 subprocess 直接执行工具
+  - Python 包装器：_run_shell(), _run_python(), _read_file(), _write_file()
+  - Go 包装器：runShell(), runPython(), readFile(), writeFile()
+  - 模式匹配：根据工具名自动识别工具类型
+  - 临时文件 → 执行 → 清理（完整的 goskills 实现模式）
+- ✅ **保持高单元测试覆盖率** (commit 665dbc9)
+  - 测试数量：25 个综合测试
+  - 测试覆盖率：61.0%
+  - 所有测试通过 ✅
   - 涵盖 Direct/Server 模式、Python/Go 执行、并发、错误处理等
 
 ### 待解决
@@ -544,9 +546,9 @@
 ### 主要目标
 
 1. **PTC 功能完善**
-   - 🎯 完善 ModeDirect 模式的实际工具调用实现
+   - ✅ 完善 ModeDirect 模式的实际工具调用实现 (commit 665dbc9)
    - 🎯 添加更多 PTC 示例和用例
-   - 🎯 增加 PTC 单元测试覆盖
+   - ✅ 保持 PTC 单元测试覆盖 (61.0%, 25 tests passing)
 
 2. **新 Showcases**
    - 🎯 计划添加 2-3 个新的 Showcase 项目
