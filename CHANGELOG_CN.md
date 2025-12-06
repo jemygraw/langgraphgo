@@ -1,5 +1,69 @@
 # 更新日志
 
+## [0.5.0] - 2025-12-06 (开发中)
+
+### 程序化工具调用 (Programmatic Tool Calling, PTC)
+- **PTC 包**: 新增 `ptc` 包，支持程序化工具调用 (#31)。
+  - LLM 生成代码直接调用工具，无需 API 往返
+  - 支持 Python 和 Go 代码执行
+  - 两种执行模式：`ModeServer`（HTTP 服务器，默认）和 `ModeDirect`（子进程，实验性）
+  - 对于复杂工具链，延迟和 token 使用降低高达 10 倍
+  - 多 LLM 支持（OpenAI、Gemini、Claude 及任何 langchaingo 兼容模型）
+
+### PTC 特性
+- **代码执行器**: 在沙箱环境中执行 LLM 生成的 Python/Go 代码，具有工具访问权限
+- **工具服务器**: 通过 REST API 安全暴露工具的 HTTP 服务器
+- **智能代码生成**: 自动为 Python 和 Go 生成工具包装器
+- **错误处理**: 完善的错误报告，包含执行输出和调试信息
+- **文档**: 完整的中英双语文档，附带 Mermaid 流程图
+
+### PTC 示例
+- **[PTC Basic](./examples/ptc_basic/)**: PTC 入门，包含计算器、天气和数据处理工具
+- **[PTC Simple](./examples/ptc_simple/)**: 简单计算器示例，演示基本 PTC 用法
+- **[PTC Expense Analysis](./examples/ptc_expense_analysis/)**: 基于 Anthropic PTC Cookbook 的复杂场景，展示数据过滤和聚合
+
+### 设计模式
+- **规划模式 (Planning Pattern)**: 添加规划模式，支持任务分解和执行规划 (#24)
+- **反思代理 (Reflection Agent)**: 实现反思-行动循环模式，支持自我评估和质量改进 (#32)
+
+### 示例展示与文档
+- **GPT Researcher**: 完整复刻 assafelovic/gpt-researcher (#34)
+  - 自动化研究和报告生成
+  - 多源信息整合
+- **Trading Agents**: 合并文档文件，创建综合 README (#39)
+  - 整合 PROJECT_SUMMARY.md 和 USAGE.md 到 README.md
+  - 添加详细使用指南、详细模式示例和 API 参考
+- **Open Deep Research**: 将 WORKFLOW.md 合并到 README 文件 (#38)
+  - 添加 5 个详细的 Mermaid 工作流程图
+  - 包含关键概念：状态累积、消息序列、并行执行
+- **Health Insights Agent**: 将 PROJECT_SUMMARY_CN.md 合并到 README_CN.md (#37)
+  - 添加技术架构、性能指标和安全考虑
+- **DeepAgents**: 添加全面文档 (#36)
+  - 完整的工具参考和最佳实践指南
+- **DeerFlow 和 BettaFish**: 更新两个示例的文档 (#35)
+
+### 代理文档
+- **CreateAgent 和 CreateReactAgent**: 添加全面的对比文档 (#33)
+  - 详细的 API 参考和使用示例
+  - 最佳实践和用例指导
+
+### 网站与知识库
+- **官方网站**: 在 https://github.com/smallnest/lango-website 建立完整网站
+  - 233 个 HTML 页面，支持中英双语
+  - 16+ 个详细指南（快速开始、高级特性、状态管理等）
+  - 展示 6 个完整项目的案例画廊
+  - 包含 20+ 个代码示例的示例页面
+- **Wiki 知识库**: 193 个 Markdown 文档，涵盖：
+  - 高级特性（人机协作、可视化、子图、并行执行）
+  - 检查点存储（SQLite、Redis、PostgreSQL）
+  - 工具集成指南
+  - 预构建组件和 RAG 指南
+
+### 文档整合
+- 简化文档结构，采用更清晰的命名约定
+- 将分散的文档合并到综合 README 文件
+- 改进所有示例展示的导航和可发现性
+
 ## [0.4.0] - 2025-12-04
 
 ### 核心与代理 (Core & Agents)

@@ -1,9 +1,9 @@
 # Changelog
 
-## [0.5.0] - 2025-12-06
+## [0.5.0] - 2025-12-06 (In Development)
 
 ### Programmatic Tool Calling (PTC)
-- **PTC Package**: Added new `ptc` package for programmatic tool calling (#27).
+- **PTC Package**: Added new `ptc` package for programmatic tool calling (#31).
   - LLM generates code that calls tools directly instead of requiring API round-trips
   - Supports both Python and Go code execution
   - Two execution modes: `ModeServer` (HTTP server, default) and `ModeDirect` (subprocess, experimental)
@@ -17,15 +17,52 @@
 - **Error Handling**: Robust error reporting with execution output and debugging information
 - **Documentation**: Complete bilingual documentation (English & Chinese) with Mermaid flow diagrams
 
-### Examples
+### PTC Examples
 - **[PTC Basic](./examples/ptc_basic/)**: Introduction to PTC with calculator, weather, and data processing tools
 - **[PTC Simple](./examples/ptc_simple/)**: Simple calculator example demonstrating basic PTC usage
 - **[PTC Expense Analysis](./examples/ptc_expense_analysis/)**: Complex scenario based on Anthropic PTC Cookbook, showing data filtering and aggregation
 
-### Documentation
-- Added comprehensive PTC documentation in `ptc/README.md` and `ptc/README_CN.md`
-- Included execution flow diagrams and detailed API reference
-- Updated root README files to include PTC feature and examples
+### Design Patterns
+- **Planning Pattern**: Added planning mode for task decomposition and execution planning (#24)
+- **Reflection Agent**: Implemented reflection-action loop pattern for self-assessment and quality improvement (#32)
+
+### Showcases & Documentation
+- **GPT Researcher**: Complete replication of assafelovic/gpt-researcher (#34)
+  - Automated research and report generation
+  - Multi-source information integration
+- **Trading Agents**: Merged documentation files for comprehensive README (#39)
+  - Integrated PROJECT_SUMMARY.md and USAGE.md into README.md
+  - Added detailed usage guide, verbose mode examples, and API reference
+- **Open Deep Research**: Merged WORKFLOW.md into README files (#38)
+  - Added 5 detailed Mermaid workflow diagrams
+  - Included key concepts: state accumulation, message sequence, parallel execution
+- **Health Insights Agent**: Merged PROJECT_SUMMARY_CN.md into README_CN.md (#37)
+  - Added technical architecture, performance metrics, and security considerations
+- **DeepAgents**: Added comprehensive documentation (#36)
+  - Complete tool reference and best practices guide
+- **DeerFlow & BettaFish**: Updated documentation for both showcases (#35)
+
+### Agent Documentation
+- **CreateAgent & CreateReactAgent**: Added comprehensive comparison documentation (#33)
+  - Detailed API reference and usage examples
+  - Best practices and use case guidance
+
+### Website & Knowledge Base
+- **Official Website**: Established complete website at https://github.com/smallnest/lango-website
+  - 233 HTML pages with bilingual support
+  - 16+ detailed guides (Getting Started, Advanced Features, State Management, etc.)
+  - Showcase gallery with 6 complete projects
+  - Examples page with 20+ code examples
+- **Wiki Knowledge Base**: 193 Markdown documents covering:
+  - Advanced features (HITL, Visualization, Subgraphs, Parallel Execution)
+  - Checkpoint storage (SQLite, Redis, PostgreSQL)
+  - Tool integration guides
+  - Pre-built components and RAG guides
+
+### Documentation Consolidation
+- Simplified documentation structure with clearer naming conventions
+- Merged scattered documentation into comprehensive README files
+- Improved navigation and discoverability across all showcases
 
 ## [0.4.0] - 2025-12-04
 
