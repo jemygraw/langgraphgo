@@ -13,7 +13,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== Memory-Enabled Chatbot Simulation ===\n")
+	fmt.Println("=== Memory-Enabled Chatbot Simulation ===")
 
 	// Example 1: Chatbot with ConversationBuffer
 	fmt.Println("--- Example 1: Full Memory (ConversationBuffer) ---")

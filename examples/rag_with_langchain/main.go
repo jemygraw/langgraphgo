@@ -16,7 +16,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== RAG with LangChain DocumentLoaders Example ===\n")
+	fmt.Println("=== RAG with LangChain DocumentLoaders Example ===")
 
 	// Initialize LLM
 	llm, err := openai.New()

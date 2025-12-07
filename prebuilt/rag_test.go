@@ -2,6 +2,7 @@ package prebuilt
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/tmc/langchaingo/llms"
@@ -174,7 +175,7 @@ func TestRAGPipelineBasic(t *testing.T) {
 	ctx := context.Background()
 
 	// Create LLM
-	llm, err := openai.New(openai.WithModel("gpt-3.5-turbo"))
+	llm, err := openai.New()
 	if err != nil {
 		t.Skip("Skipping test: OpenAI not configured")
 	}
@@ -235,6 +236,10 @@ func TestRAGPipelineBasic(t *testing.T) {
 		Query: "What is LangGraph?",
 	})
 	if err != nil {
+		// Skip if API key is invalid or missing (401 error)
+		if strings.Contains(err.Error(), "401") || strings.Contains(err.Error(), "API key") {
+			t.Skip("Skipping test: OpenAI API key not configured or invalid")
+		}
 		t.Fatalf("Failed to run pipeline: %v", err)
 	}
 

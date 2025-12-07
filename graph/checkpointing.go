@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sort"
 	"sync"
 	"time"
 )
@@ -83,6 +84,11 @@ func (m *MemoryCheckpointStore) List(_ context.Context, executionID string) ([]*
 			checkpoints = append(checkpoints, checkpoint)
 		}
 	}
+
+	// Sort by version (ascending order) so latest is last
+	sort.Slice(checkpoints, func(i, j int) bool {
+		return checkpoints[i].Version < checkpoints[j].Version
+	})
 
 	return checkpoints, nil
 }
@@ -252,12 +258,21 @@ func (cr *CheckpointableRunnable) InvokeWithConfig(ctx context.Context, initialS
 
 // SaveCheckpoint manually saves a checkpoint
 func (cr *CheckpointableRunnable) SaveCheckpoint(ctx context.Context, nodeName string, state interface{}) error {
+	// Get current version from existing checkpoints
+	checkpoints, err := cr.config.Store.List(ctx, cr.executionID)
+	version := 1
+	if err == nil && len(checkpoints) > 0 {
+		// Get the latest version
+		latest := checkpoints[len(checkpoints)-1]
+		version = latest.Version + 1
+	}
+
 	checkpoint := &Checkpoint{
 		ID:        generateCheckpointID(),
 		NodeName:  nodeName,
 		State:     state,
 		Timestamp: time.Now(),
-		Version:   1,
+		Version:   version,
 		Metadata: map[string]interface{}{
 			"execution_id": cr.executionID,
 		},
@@ -309,24 +324,31 @@ func (cl *CheckpointListener) OnGraphStep(ctx context.Context, stepNode string, 
 		return
 	}
 
+	// Get current version from existing checkpoints
+	checkpoints, err := cl.store.List(ctx, cl.executionID)
+	version := 1
+	if err == nil && len(checkpoints) > 0 {
+		// Get the latest version
+		latest := checkpoints[len(checkpoints)-1]
+		version = latest.Version + 1
+	}
+
 	checkpoint := &Checkpoint{
 		ID:        generateCheckpointID(),
 		NodeName:  stepNode,
 		State:     state,
 		Timestamp: time.Now(),
-		Version:   1,
+		Version:   version,
 		Metadata: map[string]interface{}{
 			"execution_id": cl.executionID,
 			"event":        "step",
 		},
 	}
 
-	// Save checkpoint asynchronously
-	go func(ctx context.Context) {
-		if saveErr := cl.store.Save(ctx, checkpoint); saveErr != nil {
-			_ = saveErr
-		}
-	}(ctx)
+	// Save checkpoint synchronously to avoid race conditions in tests
+	if saveErr := cl.store.Save(ctx, checkpoint); saveErr != nil {
+		_ = saveErr
+	}
 }
 
 // OnNodeEvent is no longer used for saving state, but kept if needed for interface compatibility

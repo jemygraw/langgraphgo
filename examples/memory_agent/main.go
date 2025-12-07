@@ -200,7 +200,7 @@ func (a *ChatAgent) GetStats() (*memory.Stats, error) {
 func demoCustomerSupport() {
 	fmt.Println("\n=== Customer Support Scenario ===")
 	fmt.Println("Strategy: Sliding Window (keeps last 5 messages)")
-	fmt.Println("Use case: Recent conversation context is most important\n")
+	fmt.Println("Use case: Recent conversation context is most important")
 
 	agent := NewChatAgent("sliding")
 	conversation := []string{
@@ -227,7 +227,7 @@ func demoCustomerSupport() {
 func demoLongConsultation() {
 	fmt.Println("\n=== Long Consultation Scenario ===")
 	fmt.Println("Strategy: Summarization (summarizes old, keeps recent)")
-	fmt.Println("Use case: Long sessions where history matters\n")
+	fmt.Println("Use case: Long sessions where history matters")
 
 	agent := NewChatAgent("summarization")
 
@@ -260,7 +260,7 @@ func demoLongConsultation() {
 func demoKnowledgeBase() {
 	fmt.Println("\n=== Knowledge Base Scenario ===")
 	fmt.Println("Strategy: Retrieval (retrieves relevant messages)")
-	fmt.Println("Use case: Large history, query-driven retrieval\n")
+	fmt.Println("Use case: Large history, query-driven retrieval")
 
 	agent := NewChatAgent("retrieval")
 
@@ -289,7 +289,7 @@ func demoKnowledgeBase() {
 func demoImportantInfo() {
 	fmt.Println("\n=== Important Information Tracking ===")
 	fmt.Println("Strategy: Hierarchical (keeps important + recent)")
-	fmt.Println("Use case: Some messages more important than others\n")
+	fmt.Println("Use case: Some messages more important than others")
 
 	agent := NewChatAgent("hierarchical")
 
@@ -320,7 +320,7 @@ func demoImportantInfo() {
 func demoGraphRelationships() {
 	fmt.Println("\n=== Topic Relationship Tracking ===")
 	fmt.Println("Strategy: Graph-Based (tracks topic relationships)")
-	fmt.Println("Use case: Related topics and cross-references\n")
+	fmt.Println("Use case: Related topics and cross-references")
 
 	agent := NewChatAgent("graph")
 
@@ -431,7 +431,7 @@ func main() {
 	}
 
 	fmt.Println("=== Memory-Powered Agent Demonstrations ===")
-	fmt.Println("Showing how different memory strategies affect agent behavior\n")
+	fmt.Println("Showing how different memory strategies affect agent behavior")
 
 	// Run different scenarios
 	demoCustomerSupport()

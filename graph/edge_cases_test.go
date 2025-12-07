@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -234,15 +235,15 @@ func TestPanicRecovery(t *testing.T) {
 		t.Fatalf("Failed to compile: %v", err)
 	}
 
-	// This should handle the panic gracefully
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Expected panic to propagate")
-		}
-	}()
-
+	// This should handle the panic gracefully and convert it to an error
 	ctx := context.Background()
-	_, _ = runnable.Invoke(ctx, "test")
+	_, err = runnable.Invoke(ctx, "test")
+	if err == nil {
+		t.Error("Expected error from panic recovery")
+	}
+	if err != nil && !strings.Contains(err.Error(), "panic in node panic_node") {
+		t.Errorf("Expected panic error, got: %v", err)
+	}
 }
 
 // TestComplexConditionalRouting tests complex conditional edge scenarios

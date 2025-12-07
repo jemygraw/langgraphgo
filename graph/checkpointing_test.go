@@ -614,6 +614,8 @@ func TestCheckpointing_Integration(t *testing.T) {
 		checkpointsByNode[checkpoint.NodeName] = checkpoint
 	}
 
+	fmt.Printf("checkpoints: %+v\n", checkpointsByNode)
+
 	// Check analyze checkpoint
 	if analyzeCP, exists := checkpointsByNode["analyze"]; exists {
 		state := analyzeCP.State.(map[string]interface{})

@@ -11,7 +11,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== Memory Strategies Examples ===\n")
+	fmt.Println("=== Memory Strategies Examples ===")
 
 	// 1. Sequential Memory
 	fmt.Println("1. Sequential Memory (Keep-It-All)")

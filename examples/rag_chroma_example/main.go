@@ -19,7 +19,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== RAG with Chroma VectorStore Example ===\n")
+	fmt.Println("=== RAG with Chroma VectorStore Example ===")
 
 	// Initialize LLM
 	llm, err := openai.New()
@@ -113,7 +113,7 @@ Popular Go frameworks and libraries:
 		log.Fatalf("Failed to add documents to Chroma: %v", err)
 	}
 
-	fmt.Println("Documents successfully added to Chroma\n")
+	fmt.Println("Documents successfully added to Chroma")
 
 	// Build RAG pipeline
 	fmt.Println("Building RAG pipeline...")
@@ -137,7 +137,7 @@ Popular Go frameworks and libraries:
 		log.Fatalf("Failed to compile pipeline: %v", err)
 	}
 
-	fmt.Println("Pipeline ready!\n")
+	fmt.Println("Pipeline ready!")
 
 	// Test queries
 	queries := []string{

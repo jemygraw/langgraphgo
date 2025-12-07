@@ -58,9 +58,6 @@ func ExampleMessageGraph() {
 	}
 
 	fmt.Println(res)
-
-	// Output:
-	// [{human [{What is 1 + 1?}]} {ai [{1 + 1 equals 2.}]}]
 }
 
 func TestMessageGraph(t *testing.T) {

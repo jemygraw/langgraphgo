@@ -265,6 +265,13 @@ func (r *Runnable) InvokeWithConfig(ctx context.Context, initialState interface{
 			go func(index int, n Node, name string) {
 				defer wg.Done()
 
+				// Recover from panics in node execution
+				defer func() {
+					if r := recover(); r != nil {
+						errorsList[index] = fmt.Errorf("panic in node %s: %v", name, r)
+					}
+				}()
+
 				// Start node tracing
 				var nodeSpan *TraceSpan
 				if r.tracer != nil {
@@ -471,7 +478,12 @@ func (r *Runnable) InvokeWithConfig(ctx context.Context, initialState interface{
 		if config != nil && len(config.Callbacks) > 0 {
 			for _, cb := range config.Callbacks {
 				if gcb, ok := cb.(GraphCallbackHandler); ok {
-					nodeName := fmt.Sprintf("step:%v", nodesRan)
+					var nodeName string
+					if len(nodesRan) == 1 {
+						nodeName = nodesRan[0]
+					} else {
+						nodeName = fmt.Sprintf("step:%v", nodesRan)
+					}
 					gcb.OnGraphStep(ctx, nodeName, state)
 				}
 			}

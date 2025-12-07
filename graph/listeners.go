@@ -317,8 +317,7 @@ func (lr *ListenableRunnable) InvokeWithConfig(ctx context.Context, initialState
 		if config != nil && len(config.Callbacks) > 0 {
 			for _, cb := range config.Callbacks {
 				if gcb, ok := cb.(GraphCallbackHandler); ok {
-					nodeName := fmt.Sprintf("step:[%s]", currentNode) // Format to match []string format roughly
-					gcb.OnGraphStep(ctx, nodeName, state)
+					gcb.OnGraphStep(ctx, currentNode, state)
 				}
 			}
 		}

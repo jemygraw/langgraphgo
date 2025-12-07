@@ -343,15 +343,28 @@ func isResponseSatisfactory(reflection string) bool {
 	satisfactoryCount := 0
 	issueCount := 0
 
+	// Check satisfactory keywords first (including longer phrases)
 	for _, keyword := range satisfactoryKeywords {
 		if strings.Contains(reflectionLower, keyword) {
 			satisfactoryCount++
 		}
 	}
 
+	// Check issue keywords, but exclude if they're part of a satisfactory phrase
+	// For example, "issue" in "no major issues" shouldn't count as negative
 	for _, keyword := range issueKeywords {
 		if strings.Contains(reflectionLower, keyword) {
-			issueCount++
+			// Check if this keyword is part of a satisfactory phrase
+			isPartOfSatisfactory := false
+			for _, satKeyword := range satisfactoryKeywords {
+				if strings.Contains(satKeyword, keyword) && strings.Contains(reflectionLower, satKeyword) {
+					isPartOfSatisfactory = true
+					break
+				}
+			}
+			if !isPartOfSatisfactory {
+				issueCount++
+			}
 		}
 	}
 

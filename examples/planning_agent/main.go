@@ -121,7 +121,7 @@ func runAgent(agent *graph.StateRunnable, query string) {
 			}
 		}
 	}
-	fmt.Println("------------------------\n")
+	fmt.Println("------------------------")
 }
 
 // Node implementations

@@ -15,7 +15,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== RAG with LangChain Embeddings Example ===\n")
+	fmt.Println("=== RAG with LangChain Embeddings Example ===")
 
 	// Example 1: Using OpenAI Embeddings
 	fmt.Println("Example 1: Using OpenAI Embeddings")
