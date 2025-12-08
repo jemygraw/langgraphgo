@@ -39,6 +39,9 @@
 - **[Planning Agent](planning_agent/README_CN.md)**: 根据用户请求动态创建工作流计划的智能代理。
 - **[Supervisor](supervisor/README_CN.md)**: 使用 Supervisor 进行多代理编排。
 - **[Swarm](swarm/README_CN.md)**: 使用切换 (handoffs) 的多代理协作.
+- **[Chat Agent](chat_agent/README_CN.md)**: 支持自动会话管理的多轮对话代理。
+- **[Chat Agent Async](chat_agent_async/README_CN.md)**: 异步流式聊天代理，支持实时 LLM 响应流式传输。
+- **[Chat Agent Dynamic Tools](chat_agent_dynamic_tools/README_CN.md)**: 支持运行时工具管理的聊天代理。
 
 ## 程序化工具调用 (PTC - Programmatic Tool Calling)
 - **[PTC Basic](ptc_basic/README_CN.md)**: 程序化工具调用入门，降低延迟和提高 Token 效率。

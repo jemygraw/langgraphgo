@@ -39,6 +39,9 @@ This directory contains various examples demonstrating the features of LangGraph
 - **[Planning Agent](planning_agent/README.md)**: Intelligent agent that dynamically creates workflow plans based on user requests.
 - **[Supervisor](supervisor/README.md)**: Multi-agent orchestration using a supervisor.
 - **[Swarm](swarm/README.md)**: Multi-agent collaboration using handoffs.
+- **[Chat Agent](chat_agent/README.md)**: Multi-turn conversation agent with automatic session management.
+- **[Chat Agent Async](chat_agent_async/README.md)**: Asynchronous streaming chat agent with real-time LLM response streaming.
+- **[Chat Agent Dynamic Tools](chat_agent_dynamic_tools/README.md)**: Chat agent with runtime tool management capabilities.
 
 ## Programmatic Tool Calling (PTC)
 - **[PTC Basic](ptc_basic/README.md)**: Introduction to Programmatic Tool Calling for reduced latency and token efficiency.
