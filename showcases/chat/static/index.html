@@ -5,10 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LangGraphGo 聊天应用</title>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/marked/11.1.1/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/styles/default.min.css">
+    <script src="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
     <script>
         MathJax = {
             tex: {
@@ -21,7 +21,7 @@
             }
         };
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" id="MathJax-script"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/mathjax/3.2.2/es5/tex-svg.js" id="MathJax-script"></script>
     <style>
         * {
             margin: 0;
@@ -33,28 +33,137 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
         }
 
         .container {
             display: flex;
-            width: 95%;
-            max-width: 1400px;
-            height: 90vh;
+            width: 80%;
+            max-width: 60%;
+            height: calc(100vh - 40px);
+            margin: 0 auto;
             background: white;
             border-radius: 20px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             overflow: hidden;
         }
 
+        /* Responsive adjustments */
+        @media (max-width: 1600px) {
+            .container {
+                width: 85%;
+                max-width: 70%;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .container {
+                width: 90%;
+                max-width: 80%;
+            }
+        }
+
+        @media (max-width: 1400px) {
+            .sidebar {
+                width: 240px;
+            }
+            .artifacts-sidebar {
+                width: 340px;
+            }
+            .chat-area {
+                min-width: 350px;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .sidebar {
+                width: 220px;
+            }
+            .artifacts-sidebar {
+                width: 320px;
+            }
+            .chat-area {
+                min-width: 300px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                width: 100%;
+                height: calc(100vh - 20px);
+                border-radius: 10px;
+            }
+            .sidebar {
+                width: 200px;
+            }
+            .artifacts-sidebar {
+                width: 280px;
+            }
+            .chat-area {
+                min-width: 250px;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .sidebar {
+                width: 60px; /* Always collapsed on mobile */
+            }
+            .sidebar.collapsed .sidebar-header,
+            .sidebar.collapsed .sessions-list {
+                display: none;
+            }
+            .artifacts-sidebar {
+                width: 60px; /* Always collapsed on mobile */
+            }
+            .chat-area {
+                min-width: 0;
+            }
+        }
+
         .sidebar {
-            width: 280px;
+            width: 260px;
             background: #f7f9fc;
             border-right: 1px solid #e1e8ed;
             display: flex;
             flex-direction: column;
+            position: relative;
+            transition: width 0.3s ease;
+        }
+
+        .sidebar.collapsed {
+            width: 60px;
+        }
+
+        .collapse-btn {
+            position: absolute;
+            right: -20px;
+            top: 20px;
+            width: 40px;
+            height: 40px;
+            background: white;
+            border: 1px solid #e1e8ed;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s;
+            z-index: 10;
+        }
+
+        .collapse-btn:hover {
+            background: #f0f3ff;
+            transform: scale(1.1);
+        }
+
+        .sidebar.collapsed .collapse-btn svg {
+            transform: rotate(180deg);
         }
 
         .sidebar-header {
@@ -67,6 +176,7 @@
             font-size: 18px;
             color: #2c3e50;
             margin-bottom: 15px;
+            transition: opacity 0.3s;
         }
 
         .new-chat-btn {
@@ -80,6 +190,93 @@
             font-size: 14px;
             font-weight: 600;
             transition: background 0.3s;
+        }
+
+        /* Hide sidebar content when collapsed */
+        .sidebar.collapsed .sidebar-header,
+        .sidebar.collapsed .sessions-list {
+            opacity: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        /* Artifact placeholder button styles */
+        .artifact-placeholder {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 20px;
+            margin: 15px 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .artifact-placeholder::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%);
+            border-radius: 10px;
+        }
+
+        .artifact-placeholder:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+            background: linear-gradient(135deg, #5568d3 0%, #6a4c93 100%);
+        }
+
+        .artifact-placeholder:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
+        }
+
+        .artifact-placeholder-icon {
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .artifact-placeholder-text {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 2px;
+            flex: 1;
+        }
+
+        .artifact-placeholder-label {
+            font-size: 12px;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .artifact-placeholder-title {
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .artifact-placeholder-arrow {
+            margin-left: auto;
+            font-size: 16px;
+            transition: transform 0.3s ease;
+        }
+
+        .artifact-placeholder:hover .artifact-placeholder-arrow {
+            transform: translateX(3px);
         }
 
         .new-chat-btn:hover {
@@ -124,34 +321,159 @@
             color: #7f8c8d;
         }
 
+        .session-meta-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 4px;
+        }
+
         .session-actions {
-            margin-top: 8px;
             display: flex;
             gap: 8px;
         }
 
         .session-action-btn {
-            padding: 4px 8px;
-            font-size: 11px;
+            padding: 2px 6px;
+            font-size: 10px;
             border: none;
-            border-radius: 4px;
+            border-radius: 3px;
             cursor: pointer;
-            transition: background 0.3s;
+            transition: all 0.2s;
+            font-weight: 500;
         }
 
         .delete-btn {
             background: #e74c3c;
             color: white;
+            opacity: 0.8;
         }
 
         .delete-btn:hover {
             background: #c0392b;
+            opacity: 1;
+            transform: scale(1.05);
         }
 
         .chat-area {
             flex: 1;
             display: flex;
             flex-direction: column;
+            min-width: 400px; /* Minimum width for chat area */
+        }
+
+        /* Artifacts Sidebar Styles */
+        .artifacts-sidebar {
+            width: 380px;
+            background: #f7f9fc;
+            border-left: 1px solid #e1e8ed;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            transition: width 0.3s ease;
+        }
+
+        .artifacts-sidebar.collapsed {
+            width: 60px;
+        }
+
+        .artifacts-collapse-btn {
+            position: absolute;
+            left: -20px;
+            top: 20px;
+            width: 40px;
+            height: 40px;
+            background: white;
+            border: 1px solid #e1e8ed;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s;
+            z-index: 10;
+        }
+
+        .artifacts-collapse-btn:hover {
+            background: #f0f3ff;
+            transform: scale(1.1);
+        }
+
+        .artifacts-sidebar.collapsed .artifacts-collapse-btn svg {
+            transform: rotate(180deg);
+        }
+
+        .artifacts-header {
+            padding: 20px;
+            background: white;
+            border-bottom: 1px solid #e1e8ed;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .artifacts-header h2 {
+            font-size: 18px;
+            color: #2c3e50;
+            margin: 0;
+            transition: opacity 0.3s;
+        }
+
+        .artifacts-header .artifact-title {
+            font-size: 16px;
+            color: #667eea;
+            font-weight: 600;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
+
+        .artifacts-header .artifact-type {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: #f7f9fc;
+            border-radius: 50%;
+            font-size: 20px;
+            color: #667eea;
+            margin-right: 15px;
+        }
+
+  
+        @keyframes pulse-glow {
+            0%, 100% {
+                opacity: 0.8;
+            }
+            50% {
+                opacity: 1;
+            }
+        }
+
+        .artifacts-content {
+            flex: 1;
+            padding: 25px;
+            overflow-y: auto;
+            background: #fafbfc;
+            min-height: 0;
+        }
+
+        .no-artifacts {
+            text-align: center;
+            padding: 50px;
+            color: #7f8c8d;
+        }
+
+        /* Hide artifacts content when collapsed */
+        .artifacts-sidebar.collapsed .artifacts-header,
+        .artifacts-sidebar.collapsed .artifacts-content {
+            opacity: 0;
+            pointer-events: none;
+            overflow: hidden;
         }
 
         .chat-header {
@@ -324,6 +646,20 @@
             font-weight: 600;
         }
 
+        /* Mermaid diagram styling */
+        .message-content .mermaid {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            border: 1px solid #e1e8ed;
+            overflow-x: auto;
+        }
+
+        .message-content .mermaid svg {
+            max-width: 100%;
+            height: auto;
+        }
 
         .message-time {
             font-size: 11px;
@@ -432,12 +768,118 @@
             background: #fadbd8;
             border-radius: 8px;
         }
+
+        /* Artifacts Styles */
+        .artifact-card {
+            background: #f8f9fa;
+            border: 1px solid #e1e8ed;
+            border-radius: 8px;
+            margin: 15px 0;
+            overflow: hidden;
+        }
+
+        .artifact-header {
+            background: #667eea;
+            color: white;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .artifact-title {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .artifact-type {
+            font-size: 11px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 8px;
+            border-radius: 12px;
+        }
+
+        .artifact-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .artifact-action-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        .artifact-action-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .artifact-preview {
+            padding: 15px;
+            background: white;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .artifact-preview pre {
+            margin: 0;
+            background: #f7f9fc;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        /* Artifact display styles */
+        .artifact-full {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid #e1e8ed;
+            margin-bottom: 20px;
+        }
+
+        .artifact-full pre {
+            margin: 0;
+            padding: 15px;
+            background: #f7f9fc;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 13px;
+        }
+
+        .artifact-full iframe {
+            width: 100%;
+            height: 400px;
+            border: none;
+            border-radius: 4px;
+        }
+
+        .artifact-full svg,
+        .artifact-full img {
+            max-width: 100%;
+            height: auto;
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <div class="sidebar">
+        <div class="sidebar" id="sidebar">
+            <div class="collapse-btn" id="collapse-btn" onclick="toggleSidebar()">
+                <svg id="collapse-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15,18 9,12 15,6"></polyline>
+                </svg>
+            </div>
             <div class="sidebar-header">
                 <h2>聊天会话</h2>
                 <button class="new-chat-btn" onclick="createNewSession(false)">+ 新建聊天</button>
@@ -465,12 +907,38 @@
                 </div>
             </div>
         </div>
+
+        <div class="artifacts-sidebar" id="artifacts-sidebar">
+            <div class="artifacts-collapse-btn" id="artifacts-collapse-btn" onclick="toggleArtifactsSidebar()">
+                <svg id="artifacts-collapse-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9,18 15,12 9,6"></polyline>
+                </svg>
+            </div>
+            <div class="artifacts-header" id="artifacts-header">
+                <h2 id="artifacts-title">Artifacts</h2>
+            </div>
+            <div class="artifacts-content" id="artifacts-content">
+                <div class="no-artifacts">No artifacts in this session</div>
+            </div>
+        </div>
     </div>
 
+    
     <script>
         mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
 
         let currentSessionId = null;
+
+        // Initialize artifacts sidebar as collapsed
+        document.addEventListener('DOMContentLoaded', () => {
+            const artifactsSidebar = document.getElementById('artifacts-sidebar');
+            if (artifactsSidebar) {
+                artifactsSidebar.classList.add('collapsed');
+            }
+        });
+        let sidebarCollapsed = false;
+        let artifacts = new Map(); // Store artifacts by ID
+        let currentArtifactId = null; // Track currently displayed artifact
 
         // Load sessions on page load
         loadSessions();
@@ -511,8 +979,8 @@
                     item.setAttribute('data-session-id', session.id);
                     item.innerHTML = `
                         <div class="session-title">${session.title || '新会话'}</div>
-                        <div class="session-meta">${session.message_count} 条消息 • ${formatDate(session.updated_at)}</div>
-                        <div class="session-actions">
+                        <div class="session-meta-row">
+                            <div class="session-meta">${session.message_count} 条消息 • ${formatDate(session.updated_at)}</div>
                             <button class="session-action-btn delete-btn" onclick="deleteSession('${session.id}', event)">删除</button>
                         </div>
                     `;
@@ -549,6 +1017,9 @@
         }
 
         async function selectSession(sessionId) {
+            // Clear and save current artifacts before switching
+            clearArtifacts();
+
             currentSessionId = sessionId;
             document.getElementById('message-input').disabled = false;
             document.getElementById('send-btn').disabled = false;
@@ -576,6 +1047,9 @@
 
                 const messagesDiv = document.getElementById('messages');
                 messagesDiv.innerHTML = '';
+
+                // Clear artifacts before loading history
+                artifacts.clear();
 
                 for (const msg of messages) {
                     await addMessageToUI(msg.role, msg.content, msg.timestamp);
@@ -653,9 +1127,47 @@
 
             const time = new Date(timestamp).toLocaleTimeString();
             let processedContent = '';
+            let extractedArtifacts = [];
+
             if (role === 'assistant') {
-                // Render Markdown for assistant messages
-                processedContent = marked.parse(content);
+                // First extract artifacts from content
+                const result = extractArtifacts(content);
+                extractedArtifacts = result.artifacts;
+
+                console.log('Extracted artifacts:', extractedArtifacts); // Debug log
+                console.log('Current session ID:', currentSessionId); // Debug log
+
+                // Store artifacts
+                extractedArtifacts.forEach(artifact => {
+                    artifacts.set(artifact.id, artifact);
+                });
+
+                console.log('All artifacts after adding:', Array.from(artifacts.entries())); // Debug log
+
+                // Parse Markdown (this will convert code blocks to HTML)
+                processedContent = marked.parse(result.content);
+
+                // Find and replace artifact markers in the parsed HTML
+                const markerRegex = /<!-- ARTIFACT:(.*?) -->/g;
+                processedContent = processedContent.replace(markerRegex, (match, artifactId) => {
+                    const artifact = artifacts.get(artifactId);
+                    if (artifact) {
+                        return `<div class="artifact-placeholder" data-artifact-id="${artifactId}">
+                            <span class="artifact-placeholder-icon">${getTypeIcon(artifact.type)}</span>
+                            <div class="artifact-placeholder-text">
+                                <div class="artifact-placeholder-label">Artifact</div>
+                                <div class="artifact-placeholder-title">${artifact.title}</div>
+                            </div>
+                            <span class="artifact-placeholder-arrow">→</span>
+                        </div>`;
+                    }
+                    return match;
+                });
+
+                // Update artifacts display
+                if (isArtifactsOpen) {
+                    updateArtifactsDisplay();
+                }
             } else {
                 // Escape HTML for user messages
                 processedContent = escapeHtml(content);
@@ -694,9 +1206,34 @@
             messageDiv.appendChild(messageContentDiv);
             messagesDiv.appendChild(messageDiv);
 
+            // Add click handler for artifact placeholders
+            const placeholders = messageDiv.querySelectorAll('.artifact-placeholder');
+            placeholders.forEach(placeholder => {
+                // Add click handler
+                placeholder.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const artifactId = this.getAttribute('data-artifact-id');
+                    console.log('Artifact clicked:', artifactId); // Debug log
+                    openArtifactsModal();
+                    showArtifact(artifactId);
+                });
+            });
+
             // Process MathJax, Mermaid, and Highlight.js
             if (role === 'assistant') {
                 await MathJax.typesetPromise([messageDiv]);
+
+                // Process Mermaid code blocks
+                const mermaidCodeBlocks = messageDiv.querySelectorAll('pre code.language-mermaid');
+                for (const codeBlock of mermaidCodeBlocks) {
+                    const code = codeBlock.textContent;
+                    const mermaidDiv = document.createElement('div');
+                    mermaidDiv.className = 'mermaid';
+                    mermaidDiv.textContent = code;
+                    codeBlock.parentNode.replaceWith(mermaidDiv);
+                }
+
                 try {
                     await mermaid.run({
                         nodes: messageDiv.querySelectorAll('.mermaid')
@@ -704,6 +1241,8 @@
                 } catch(e) {
                     console.error("Mermaid rendering error:", e);
                 }
+
+                // Highlight code blocks (excluding mermaid which has been replaced)
                 messageDiv.querySelectorAll('pre code').forEach((block) => {
                     hljs.highlightElement(block);
                 });
@@ -744,17 +1283,32 @@
 
             try {
                 await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' });
+
                 if (sessionId === currentSessionId) {
                     currentSessionId = null;
                     document.getElementById('messages').innerHTML = '<div class="welcome"><h2>👋 欢迎!</h2><p>创建一个新会话或选择现有会话开始聊天。</p></div>';
                     document.getElementById('message-input').disabled = true;
                     document.getElementById('send-btn').disabled = true;
                     document.getElementById('status').textContent = '选择或创建一个会话';
+
+                    // Clear artifacts if we're deleting the current session
+                    clearArtifacts();
                 }
                 loadSessions();
             } catch (error) {
                 console.error('Failed to delete session:', error);
                 alert('Failed to delete session');
+            }
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebarCollapsed = !sidebarCollapsed;
+
+            if (sidebarCollapsed) {
+                sidebar.classList.add('collapsed');
+            } else {
+                sidebar.classList.remove('collapsed');
             }
         }
 
@@ -779,7 +1333,300 @@
             div.textContent = text;
             return div.innerHTML.replace(/\n/g, '<br>');
         }
-    </script>
+
+        // Artifacts Functions
+        function extractArtifacts(content) {
+            const artifacts = [];
+            let processedContent = content;
+
+            // Types that should be extracted as artifacts
+            const artifactTypes = ['html', 'svg', 'python', 'javascript', 'js', 'shell', 'bash', 'sh',
+                                  'css', 'json', 'yaml', 'yml', 'sql', 'docker', 'dockerfile',
+                                  'go', 'java', 'cpp', 'c', 'rust', 'typescript', 'ts',
+                                  'php', 'ruby', 'swift', 'kotlin', 'markdown', 'md'];
+
+            // Extract code blocks using regex pattern
+            // Format: ```language ... ```
+            const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
+
+            let match;
+            let artifactIndex = 0;
+
+            while ((match = codeBlockRegex.exec(content)) !== null) {
+                const language = match[1] || 'text';
+                const codeContent = match[2].trim();
+
+                // Check if this type should be extracted as artifact
+                if (artifactTypes.includes(language.toLowerCase())) {
+                    const artifactId = `artifact_${Date.now()}_${artifactIndex++}`;
+                    const type = language.toLowerCase();
+
+                    // Generate a smart title based on content
+                    let title = generateArtifactTitle(codeContent, type);
+
+                    artifacts.push({
+                        id: artifactId,
+                        type: type,
+                        language: language,
+                        title: title,
+                        content: codeContent
+                    });
+
+                    // Replace code block with placeholder marker
+                    processedContent = processedContent.replace(match[0],
+                        `<!-- ARTIFACT:${artifactId} -->`);
+                }
+            }
+
+            return {
+                content: processedContent,
+                artifacts: artifacts
+            };
+        }
+
+        function generateArtifactTitle(content, type) {
+            // Try to extract a meaningful title from the content
+            const lines = content.split('\n').filter(line => line.trim());
+
+            // For HTML, look for title tag
+            if (type === 'html') {
+                const titleMatch = content.match(/<title>(.*?)<\/title>/i);
+                if (titleMatch) return titleMatch[1];
+            }
+
+            // For Python/JavaScript/Java, look for function/class/variable definitions
+            if (['python', 'javascript', 'js', 'java', 'go', 'rust', 'typescript', 'ts'].includes(type)) {
+                const funcMatch = lines.find(line =>
+                    line.match(/^(def|function|func|fn)\s+\w+/) ||
+                    line.match(/^class\s+\w+/) ||
+                    line.match(/^(const|let|var)\s+\w+/)
+                );
+                if (funcMatch) return funcMatch.trim().split(/\s+/)[1];
+            }
+
+            // For shell/bash, look for shebang or first command
+            if (['shell', 'bash', 'sh'].includes(type)) {
+                if (lines[0] && lines[0].startsWith('#!')) {
+                    return lines[0].substring(2).trim();
+                }
+            }
+
+            // For CSS, look for class or ID selectors
+            if (type === 'css') {
+                const selectorMatch = lines.find(line =>
+                    line.match(/^\.[\w-]+\s*\{/) ||
+                    line.match(/^#[\w-]+\s*\{/)
+                );
+                if (selectorMatch) return selectorMatch.trim().split(/\s+/)[0];
+            }
+
+            // For Dockerfile
+            if (type === 'dockerfile' || type === 'docker') {
+                const fromMatch = lines.find(line => line.startsWith('FROM'));
+                if (fromMatch) return `Dockerfile - ${fromMatch}`;
+            }
+
+            // Default: use first line or type name
+            if (lines.length > 0 && lines[0].length < 50) {
+                return lines[0].substring(0, 30);
+            }
+
+            return `${type.charAt(0).toUpperCase() + type.slice(1)} Code`;
+        }
+
+        let isArtifactsOpen = false;
+
+        function clearArtifacts() {
+            console.log('Clearing artifacts...'); // Debug log
+
+            // Clear current artifacts
+            artifacts.clear();
+            currentArtifactId = null;
+
+            // Update display
+            updateArtifactsDisplay();
+
+            // Close sidebar
+            if (isArtifactsOpen) {
+                const artifactsSidebar = document.getElementById('artifacts-sidebar');
+                artifactsSidebar.classList.add('collapsed');
+                isArtifactsOpen = false;
+            }
+        }
+
+        
+        function toggleArtifactsSidebar() {
+            const artifactsSidebar = document.getElementById('artifacts-sidebar');
+
+            console.log('Toggling artifacts sidebar, current artifacts count:', artifacts.size); // Debug log
+
+            isArtifactsOpen = !isArtifactsOpen;
+
+            if (isArtifactsOpen) {
+                artifactsSidebar.classList.remove('collapsed');
+                updateArtifactsDisplay();
+            } else {
+                artifactsSidebar.classList.add('collapsed');
+            }
+        }
+
+        function updateArtifactsDisplay() {
+            const titleElement = document.getElementById('artifacts-title');
+            const headerElement = document.getElementById('artifacts-header');
+            const contentContainer = document.getElementById('artifacts-content');
+
+            if (artifacts.size === 0) {
+                headerElement.innerHTML = '<h2 id="artifacts-title">Artifacts</h2>';
+                contentContainer.innerHTML = '<div class="no-artifacts">No artifacts in this session</div>';
+                currentArtifactId = null;
+                return;
+            }
+
+            // If there's a current artifact, update the header to show its info
+            if (currentArtifactId && artifacts.has(currentArtifactId)) {
+                const artifact = artifacts.get(currentArtifactId);
+                const icon = getTypeIcon(artifact.type);
+                headerElement.innerHTML = `<h2 id="artifacts-title">${icon} ${artifact.title}</h2>`;
+            } else {
+                // Show first artifact if none selected
+                const firstArtifactId = artifacts.keys().next().value;
+                if (firstArtifactId) {
+                    showArtifact(firstArtifactId);
+                }
+            }
+        }
+
+        function openArtifactsModal() {
+            if (!isArtifactsOpen) {
+                toggleArtifactsSidebar();
+            }
+        }
+
+        function closeArtifactsModal() {
+            if (isArtifactsOpen) {
+                toggleArtifactsSidebar();
+            }
+        }
+
+        function showArtifact(artifactId) {
+            const artifact = artifacts.get(artifactId);
+            if (!artifact) {
+                return;
+            }
+
+            // Update current artifact ID
+            currentArtifactId = artifactId;
+
+            // Ensure artifacts sidebar is open
+            if (!isArtifactsOpen) {
+                const artifactsSidebar = document.getElementById('artifacts-sidebar');
+                artifactsSidebar.classList.remove('collapsed');
+                isArtifactsOpen = true;
+            }
+
+            // Update header with current artifact info
+            const headerElement = document.getElementById('artifacts-header');
+            const icon = getTypeIcon(artifact.type);
+            headerElement.innerHTML = `<h2 id="artifacts-title">${icon} ${artifact.title}</h2>`;
+
+            // Show artifact content
+            const content = document.getElementById('artifacts-content');
+            content.innerHTML = '<div class="artifact-full">' + renderArtifactContent(artifact) + '</div>';
+        }
+
+        function getTypeIcon(type) {
+            const icons = {
+                'html': '🌐',
+                'svg': '🎨',
+                'python': '🐍',
+                'javascript': '⚡',
+                'shell': '🖥️',
+                'bash': '🖥️',
+                'markdown': '📝',
+                'json': '📋',
+                'yaml': '📋',
+                'css': '🎨',
+                'sql': '🗄️',
+                'docker': '🐳',
+                'kubernetes': '☸️',
+                'terraform': '🏗️',
+                'go': '🐹',
+                'java': '☕',
+                'cpp': '⚙️',
+                'c': '⚙️',
+                'rust': '🦀',
+                'typescript': '📘',
+                'php': '🐘',
+                'ruby': '💎',
+                'swift': '🍎',
+                'kotlin': '🎯'
+            };
+            return icons[type] || '📄';
+        }
+
+        function renderArtifactContent(artifact) {
+            const { type, content, language } = artifact;
+
+            switch (type) {
+                case 'html':
+                    return `<iframe srcdoc="${escapeHtml(content)}"></iframe>`;
+
+                case 'svg':
+                    return content;
+
+                case 'python':
+                case 'javascript':
+                case 'js':
+                case 'shell':
+                case 'bash':
+                case 'sh':
+                case 'markdown':
+                case 'md':
+                case 'json':
+                case 'yaml':
+                case 'yml':
+                case 'css':
+                case 'sql':
+                case 'docker':
+                case 'dockerfile':
+                case 'go':
+                case 'java':
+                case 'cpp':
+                case 'c':
+                case 'rust':
+                case 'typescript':
+                case 'ts':
+                case 'php':
+                case 'ruby':
+                case 'swift':
+                case 'kotlin':
+                case 'text':
+                default:
+                    // Map types to highlight.js languages
+                    const langMap = {
+                        'js': 'javascript',
+                        'ts': 'typescript',
+                        'sh': 'bash',
+                        'dockerfile': 'dockerfile',
+                        'md': 'markdown',
+                        'yml': 'yaml'
+                    };
+                    const hlLang = langMap[type] || language || type;
+
+                    // Try to highlight, fallback to plaintext if language not supported
+                    let highlighted;
+                    try {
+                        highlighted = hljs.highlight(content, { language: hlLang }).value;
+                    } catch (e) {
+                        highlighted = hljs.highlight(content, { language: 'plaintext' }).value;
+                    }
+                    return `<pre><code>${highlighted}</code></pre>`;
+            }
+        }
+
+  
+      
+        </script>
 </body>
 
 </html>
