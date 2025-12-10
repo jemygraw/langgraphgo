@@ -370,30 +370,43 @@ func (cl *CheckpointListener) OnGraphStep(ctx context.Context, stepNode string, 
 // or we can remove it if we don't use it as NodeListener anymore.
 // CheckpointableRunnable currently adds it as NodeListener. We should change that.
 
-// CheckpointableMessageGraph extends ListenableMessageGraph with checkpointing
-type CheckpointableMessageGraph struct {
+// CheckpointableStateGraph extends ListenableMessageGraph with checkpointing
+type CheckpointableStateGraph struct {
 	*ListenableMessageGraph
 	config CheckpointConfig
 }
 
-// NewCheckpointableMessageGraph creates a new checkpointable message graph
-func NewCheckpointableMessageGraph() *CheckpointableMessageGraph {
-	return &CheckpointableMessageGraph{
+// CheckpointableMessageGraph is an alias for CheckpointableStateGraph for backward compatibility.
+type CheckpointableMessageGraph = CheckpointableStateGraph
+
+// NewCheckpointableStateGraph creates a new checkpointable state graph
+func NewCheckpointableStateGraph() *CheckpointableStateGraph {
+	return &CheckpointableStateGraph{
 		ListenableMessageGraph: NewListenableMessageGraph(),
 		config:                 DefaultCheckpointConfig(),
 	}
 }
 
-// NewCheckpointableMessageGraphWithConfig creates a checkpointable graph with custom config
-func NewCheckpointableMessageGraphWithConfig(config CheckpointConfig) *CheckpointableMessageGraph {
-	return &CheckpointableMessageGraph{
+// NewCheckpointableMessageGraph is an alias for NewCheckpointableStateGraph for backward compatibility.
+func NewCheckpointableMessageGraph() *CheckpointableMessageGraph {
+	return NewCheckpointableStateGraph()
+}
+
+// NewCheckpointableStateGraphWithConfig creates a checkpointable graph with custom config
+func NewCheckpointableStateGraphWithConfig(config CheckpointConfig) *CheckpointableStateGraph {
+	return &CheckpointableStateGraph{
 		ListenableMessageGraph: NewListenableMessageGraph(),
 		config:                 config,
 	}
 }
 
+// NewCheckpointableMessageGraphWithConfig is an alias for NewCheckpointableStateGraphWithConfig for backward compatibility.
+func NewCheckpointableMessageGraphWithConfig(config CheckpointConfig) *CheckpointableMessageGraph {
+	return NewCheckpointableStateGraphWithConfig(config)
+}
+
 // CompileCheckpointable compiles the graph into a checkpointable runnable
-func (g *CheckpointableMessageGraph) CompileCheckpointable() (*CheckpointableRunnable, error) {
+func (g *CheckpointableStateGraph) CompileCheckpointable() (*CheckpointableRunnable, error) {
 	listenableRunnable, err := g.CompileListenable()
 	if err != nil {
 		return nil, err
@@ -403,12 +416,12 @@ func (g *CheckpointableMessageGraph) CompileCheckpointable() (*CheckpointableRun
 }
 
 // SetCheckpointConfig updates the checkpointing configuration
-func (g *CheckpointableMessageGraph) SetCheckpointConfig(config CheckpointConfig) {
+func (g *CheckpointableStateGraph) SetCheckpointConfig(config CheckpointConfig) {
 	g.config = config
 }
 
 // GetCheckpointConfig returns the current checkpointing configuration
-func (g *CheckpointableMessageGraph) GetCheckpointConfig() CheckpointConfig {
+func (g *CheckpointableStateGraph) GetCheckpointConfig() CheckpointConfig {
 	return g.config
 }
 

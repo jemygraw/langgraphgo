@@ -68,7 +68,7 @@ The market simulator provides:
 ## Workflow
 
 ```go
-workflow := graph.NewGraph[map[string]interface{}]()
+workflow := graph.NewStateGraph()
 
 // Add nodes in sequence
 workflow.AddNode("analyst", AnalystNode)
@@ -157,12 +157,12 @@ export OPENAI_API_KEY="your-api-key"
 
 ## Comparison with Other Patterns
 
-| Pattern | Description | When to Use |
-|---------|-------------|-------------|
-| **ReAct** | Reason + Act in real-time | Fast, low-stakes decisions |
-| **Planning** | Create plan, then execute | Multi-step tasks |
-| **Reflection** | Act, then critique | Quality improvement |
-| **Mental Loop** | Simulate before acting | High-stakes decisions |
+| Pattern         | Description               | When to Use                |
+| --------------- | ------------------------- | -------------------------- |
+| **ReAct**       | Reason + Act in real-time | Fast, low-stakes decisions |
+| **Planning**    | Create plan, then execute | Multi-step tasks           |
+| **Reflection**  | Act, then critique        | Quality improvement        |
+| **Mental Loop** | Simulate before acting    | High-stakes decisions      |
 
 ## Further Reading
 

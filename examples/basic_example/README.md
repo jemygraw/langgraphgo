@@ -13,7 +13,7 @@ The basic example showcases four main features:
 ## Features Demonstrated
 
 ### 1. Basic Graph Execution
-- Creating a simple MessageGraph
+- Creating a simple StateGraph
 - Adding nodes with processing functions
 - Setting up edges and entry points
 - Compiling and invoking the graph
@@ -55,7 +55,7 @@ The example will demonstrate each feature with clear output showing:
 
 ```go
 // Basic execution
-g := graph.NewMessageGraph()
+g := graph.NewStateGraph()
 g.AddNode("process", processingFunction)
 g.AddEdge("process", graph.END)
 
@@ -79,7 +79,7 @@ asciiTree := exporter.DrawASCII()
 
 ## Key Concepts
 
-- **MessageGraph**: Core workflow orchestration
+- **StateGraph**: Core workflow orchestration
 - **Listeners**: Real-time event handling and progress tracking
 - **Checkpointing**: State persistence for long-running workflows
 - **Visualization**: Graph structure representation and debugging
