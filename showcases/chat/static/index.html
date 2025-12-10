@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="page-title">LangGraphGo 聊天应用</title>
+    <title id="page-title">LangGraphGo 聊天</title>
     <link rel="preload" href="https://cdn.bootcdn.net/ajax/libs/marked/11.1.1/marked.min.js" as="script">
     <link rel="preload" href="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/highlight.min.js" as="script">
     <link rel="preload" href="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js" as="script">
@@ -27,6 +27,7 @@
         };
     </script>
     <script src="https://cdn.bootcdn.net/ajax/libs/mathjax/3.2.2/es5/tex-svg.js" id="MathJax-script" defer></script>
+    <link rel="stylesheet" href="/static/themes/themes.css">
     <style>
         * {
             margin: 0;
@@ -74,9 +75,11 @@
             .sidebar {
                 width: 240px;
             }
+
             .artifacts-sidebar {
                 width: 340px;
             }
+
             .chat-area {
                 min-width: 350px;
             }
@@ -86,9 +89,11 @@
             .sidebar {
                 width: 220px;
             }
+
             .artifacts-sidebar {
                 width: 320px;
             }
+
             .chat-area {
                 min-width: 300px;
             }
@@ -98,17 +103,21 @@
             body {
                 padding: 10px;
             }
+
             .container {
                 width: 100%;
                 height: calc(100vh - 20px);
                 border-radius: 10px;
             }
+
             .sidebar {
                 width: 200px;
             }
+
             .artifacts-sidebar {
                 width: 280px;
             }
+
             .chat-area {
                 min-width: 250px;
             }
@@ -116,15 +125,20 @@
 
         @media (max-width: 600px) {
             .sidebar {
-                width: 60px; /* Always collapsed on mobile */
+                width: 60px;
+                /* Always collapsed on mobile */
             }
+
             .sidebar.collapsed .sidebar-header,
             .sidebar.collapsed .sessions-list {
                 display: none;
             }
+
             .artifacts-sidebar {
-                width: 60px; /* Always collapsed on mobile */
+                width: 60px;
+                /* Always collapsed on mobile */
             }
+
             .chat-area {
                 min-width: 0;
             }
@@ -242,7 +256,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 100%);
             border-radius: 10px;
         }
 
@@ -292,7 +306,7 @@
             transform: translateX(3px);
         }
 
-    
+
         .sessions-list {
             flex: 1;
             overflow-y: auto;
@@ -369,7 +383,8 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            min-width: 400px; /* Minimum width for chat area */
+            min-width: 400px;
+            /* Minimum width for chat area */
         }
 
         /* Artifacts Sidebar Styles */
@@ -455,11 +470,14 @@
             margin-right: 15px;
         }
 
-  
+
         @keyframes pulse-glow {
-            0%, 100% {
+
+            0%,
+            100% {
                 opacity: 0.8;
             }
+
             50% {
                 opacity: 1;
             }
@@ -537,7 +555,7 @@
             max-height: calc(80vh - 80px);
         }
 
-        
+
         .hierarchical-list {
             display: grid;
             gap: 12px;
@@ -674,6 +692,7 @@
                 transform: translateY(30px);
                 opacity: 0;
             }
+
             to {
                 transform: translateY(0);
                 opacity: 1;
@@ -824,9 +843,12 @@
         }
 
         @keyframes pulse {
-            0%, 100% {
+
+            0%,
+            100% {
                 opacity: 1;
             }
+
             50% {
                 opacity: 0.5;
             }
@@ -919,9 +941,18 @@
             border-bottom: 1px solid #e1e8ed;
             padding-bottom: 5px;
         }
-        .message-content h1 { font-size: 1.8em; }
-        .message-content h2 { font-size: 1.5em; }
-        .message-content h3 { font-size: 1.2em; }
+
+        .message-content h1 {
+            font-size: 1.8em;
+        }
+
+        .message-content h2 {
+            font-size: 1.5em;
+        }
+
+        .message-content h3 {
+            font-size: 1.2em;
+        }
 
         .message-content p {
             line-height: 1.6;
@@ -972,12 +1003,14 @@
             border-collapse: collapse;
             margin: 15px 0;
         }
+
         .message-content th,
         .message-content td {
             border: 1px solid #e1e8ed;
             padding: 10px;
             text-align: left;
         }
+
         .message-content th {
             background-color: #f7f9fc;
             font-weight: 600;
@@ -1217,7 +1250,8 @@
     <div class="container">
         <div class="sidebar" id="sidebar">
             <div class="collapse-btn" id="collapse-btn" onclick="toggleSidebar()">
-                <svg id="collapse-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg id="collapse-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2">
                     <polyline points="15,18 9,12 15,6"></polyline>
                 </svg>
             </div>
@@ -1227,6 +1261,11 @@
             </div>
             <div class="sessions-list" id="sessions-list">
                 <p style="padding: 20px; text-align: center; color: #7f8c8d;">加载中...</p>
+            </div>
+            <div class="sidebar-footer">
+                <div class="theme-selector-sidebar" id="theme-selector" onclick="showThemeModal()" title="主题设置">
+                    <span class="theme-icon">🎨</span>
+                </div>
             </div>
         </div>
 
@@ -1265,7 +1304,8 @@
 
         <div class="artifacts-sidebar" id="artifacts-sidebar">
             <div class="artifacts-collapse-btn" id="artifacts-collapse-btn" onclick="toggleArtifactsSidebar()">
-                <svg id="artifacts-collapse-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg id="artifacts-collapse-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2">
                     <polyline points="9,18 15,12 9,6"></polyline>
                 </svg>
             </div>
@@ -1274,6 +1314,70 @@
             </div>
             <div class="artifacts-content" id="artifacts-content">
                 <div class="no-artifacts">No artifacts in this session</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Theme Modal -->
+    <div class="modal" id="theme-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🎨 主题设置</h2>
+                <button class="modal-close" onclick="closeThemeModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="theme-section">
+                    <h3>☀️ 浅色主题</h3>
+                    <div class="theme-grid">
+                        <div class="theme-option" onclick="setTheme('default-light')" data-theme="default-light">
+                            <div class="theme-preview"
+                                style="background: linear-gradient(135deg, #f8fafc 0%, #f0fdf4 50%, #ffffff 100%);">
+                            </div>
+                            <span>默认绿</span>
+                        </div>
+                        <div class="theme-option" onclick="setTheme('blue-light')" data-theme="blue-light">
+                            <div class="theme-preview"
+                                style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #ffffff 100%);">
+                            </div>
+                            <span>天空蓝</span>
+                        </div>
+                        <div class="theme-option" onclick="setTheme('purple-light')" data-theme="purple-light">
+                            <div class="theme-preview"
+                                style="background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 50%, #ffffff 100%);">
+                            </div>
+                            <span>优雅紫</span>
+                        </div>
+                        <div class="theme-option" onclick="setTheme('rose-light')" data-theme="rose-light">
+                            <div class="theme-preview"
+                                style="background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 50%, #ffffff 100%);">
+                            </div>
+                            <span>玫瑰红</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="theme-section">
+                    <h3>🌙 深色主题</h3>
+                    <div class="theme-grid">
+                        <div class="theme-option" onclick="setTheme('modern-dark')" data-theme="modern-dark">
+                            <div class="theme-preview"
+                                style="background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #0f172a 100%);">
+                            </div>
+                            <span>现代黑</span>
+                        </div>
+                        <div class="theme-option" onclick="setTheme('blue-dark')" data-theme="blue-dark">
+                            <div class="theme-preview"
+                                style="background: linear-gradient(135deg, #192036 0%, #1e3a5f 50%, #0c1222 100%);">
+                            </div>
+                            <span>深空蓝</span>
+                        </div>
+                        <div class="theme-option" onclick="setTheme('cyberpunk-dark')" data-theme="cyberpunk-dark">
+                            <div class="theme-preview"
+                                style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #0a0a0a 100%);">
+                            </div>
+                            <span>赛博朋克</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1318,6 +1422,48 @@
             chatTitle: "LangGraphGo 聊天"
         };
 
+        // Theme Management
+        let currentTheme = localStorage.getItem('chatTheme') || 'default-light';
+
+        // Apply saved theme on load
+        function applyTheme(themeName) {
+            document.documentElement.setAttribute('data-theme', themeName);
+            currentTheme = themeName;
+            localStorage.setItem('chatTheme', themeName);
+
+            // Update active state in theme selector
+            document.querySelectorAll('.theme-option').forEach(option => {
+                option.classList.remove('active');
+                if (option.dataset.theme === themeName) {
+                    option.classList.add('active');
+                }
+            });
+        }
+
+        function setTheme(themeName) {
+            applyTheme(themeName);
+            closeThemeModal();
+        }
+
+        function showThemeModal() {
+            const modal = document.getElementById('theme-modal');
+
+            // Set active state for current theme
+            document.querySelectorAll('.theme-option').forEach(option => {
+                option.classList.remove('active');
+                if (option.dataset.theme === currentTheme) {
+                    option.classList.add('active');
+                }
+            });
+
+            modal.classList.add('show');
+        }
+
+        function closeThemeModal() {
+            const modal = document.getElementById('theme-modal');
+            modal.classList.remove('show');
+        }
+
         // Load chat configuration
         async function loadConfig() {
             try {
@@ -1327,7 +1473,7 @@
                     chatConfig = config;
 
                     // Update page title
-                    document.getElementById('page-title').textContent = config.chatTitle + '应用';
+                    document.getElementById('page-title').textContent = config.chatTitle;
 
                     // Update chat title in header
                     const chatTitleElement = document.getElementById('chat-title');
@@ -1343,6 +1489,9 @@
 
         // Initialize artifacts sidebar as collapsed by default
         document.addEventListener('DOMContentLoaded', () => {
+            // Apply saved theme
+            applyTheme(currentTheme);
+
             const artifactsSidebar = document.getElementById('artifacts-sidebar');
             if (artifactsSidebar) {
                 artifactsSidebar.classList.add('collapsed');
@@ -1616,10 +1765,10 @@
 
                 // Find and replace artifact markers in the parsed HTML
                 const markerRegex = /<!-- ARTIFACT:(.*?) -->/g;
-                processedContent = processedContent.replace(markerRegex, (match, artifactId) => {
-                    const artifact = artifacts.get(artifactId);
-                    if (artifact) {
-                        return `<div class="artifact-placeholder" data-artifact-id="${artifactId}">
+                    processedContent = processedContent.replace(markerRegex, (match, artifactId) => {
+                        const artifact = artifacts.get(artifactId);
+                        if (artifact) {
+                            return `<div class="artifact-placeholder" data-artifact-id="${artifactId}">
                             <span class="artifact-placeholder-icon">${getTypeIcon(artifact.type)}</span>
                             <div class="artifact-placeholder-text">
                                 <div class="artifact-placeholder-label">Artifact</div>
@@ -1627,9 +1776,9 @@
                             </div>
                             <span class="artifact-placeholder-arrow">→</span>
                         </div>`;
-                    }
-                    return match;
-                });
+                        }
+                        return match;
+                    });
 
                 // Update artifacts display
                 if (isArtifactsOpen) {
@@ -1677,7 +1826,7 @@
             const placeholders = messageDiv.querySelectorAll('.artifact-placeholder');
             placeholders.forEach(placeholder => {
                 // Add click handler
-                placeholder.addEventListener('click', function(e) {
+                placeholder.addEventListener('click', function (e) {
                     e.preventDefault();
                     e.stopPropagation();
                     const artifactId = this.getAttribute('data-artifact-id');
@@ -1705,7 +1854,7 @@
                     await mermaid.run({
                         nodes: messageDiv.querySelectorAll('.mermaid')
                     });
-                } catch(e) {
+                } catch (e) {
                     console.error("Mermaid rendering error:", e);
                 }
 
@@ -1808,9 +1957,9 @@
 
             // Types that should be extracted as artifacts
             const artifactTypes = ['html', 'svg', 'python', 'javascript', 'js', 'shell', 'bash', 'sh',
-                                  'css', 'json', 'yaml', 'yml', 'sql', 'docker', 'dockerfile',
-                                  'go', 'java', 'cpp', 'c', 'rust', 'typescript', 'ts',
-                                  'php', 'ruby', 'swift', 'kotlin', 'markdown', 'md'];
+                'css', 'json', 'yaml', 'yml', 'sql', 'docker', 'dockerfile',
+                'go', 'java', 'cpp', 'c', 'rust', 'typescript', 'ts',
+                'php', 'ruby', 'swift', 'kotlin', 'markdown', 'md'];
 
             // Extract code blocks using regex pattern
             // Format: ```language ... ```
@@ -1924,7 +2073,7 @@
             }
         }
 
-        
+
         function toggleArtifactsSidebar() {
             const artifactsSidebar = document.getElementById('artifacts-sidebar');
 
@@ -2094,7 +2243,7 @@
             }
         }
 
-  
+
         // Tools Functions
         async function loadHierarchicalData() {
             if (!currentSessionId) return;
@@ -2284,14 +2433,14 @@
                         </div>
                         <div class="category-tools" id="skill-tools-${index}">
                             ${skill.tools && skill.tools.length > 0 ?
-                                skill.tools.map(tool => `
+                        skill.tools.map(tool => `
                                     <div class="tool-item">
                                         <div class="tool-name">${escapeHtml(tool.name)}</div>
                                         <div class="tool-description">${escapeHtml(tool.description)}</div>
                                     </div>
                                 `).join('') :
-                                '<div class="tool-item"><div class="tool-description">暂无工具</div></div>'
-                            }
+                        '<div class="tool-item"><div class="tool-description">暂无工具</div></div>'
+                    }
                         </div>
                     </div>
                 `).join('');
@@ -2365,6 +2514,7 @@
                 // Close any open modal
                 const skillsModal = document.getElementById('skills-modal');
                 const mcpModal = document.getElementById('mcp-tools-modal');
+                const themeModal = document.getElementById('theme-modal');
 
                 if (skillsModal.classList.contains('show')) {
                     closeSkillsModal();
@@ -2372,9 +2522,19 @@
                 if (mcpModal.classList.contains('show')) {
                     closeMCPToolsModal();
                 }
+                if (themeModal.classList.contains('show')) {
+                    closeThemeModal();
+                }
             }
         });
-        </script>
+
+        // Close modal when clicking outside
+        document.getElementById('theme-modal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                closeThemeModal();
+            }
+        });
+    </script>
 </body>
 
 </html>

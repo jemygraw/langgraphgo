@@ -8,8 +8,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	mcpclient "github.com/smallnest/goskills/mcp"
@@ -143,33 +145,127 @@ func NewSimpleChatAgent(llm llms.Model) *SimpleChatAgent {
 		mcpConfigPath = "../../testdata/mcp/mcp.json"
 	}
 
-	ctx := context.Background()
-	if config, err := mcpclient.LoadConfig(mcpConfigPath); err == nil {
-		if client, err := mcpclient.NewClient(ctx, config); err == nil {
-			if tools, err := mcp.MCPToTools(ctx, client); err == nil && len(tools) > 0 {
-				agent.mcpClient = client
-				agent.mcpTools = tools
-				agent.toolsEnabled = true
-				log.Printf("Loaded %d MCP tools", len(tools))
-
-				// Update system message to mention tools
-				toolsInfo := agent.getToolsInfo()
-				systemMsg.Parts[0] = llms.TextPart(fmt.Sprintf(`You are a helpful AI assistant with access to various tools.
-
-Available tools:
-%s
-
-When the user asks for something that can be done with these tools, use the tools to help them.
-Always explain what you're doing with the tools.
-Be concise and friendly in your responses.`, toolsInfo))
-				agent.messages[0] = systemMsg
-			}
-		}
-	} else {
-		log.Printf("Failed to load MCP config: %v", err)
+	// Safely initialize MCP with error recovery
+	if err := agent.initializeMCP(mcpConfigPath); err != nil {
+		log.Printf("MCP initialization failed (continuing without MCP): %v", err)
+		// Continue without MCP tools
 	}
 
 	return agent
+}
+
+// initializeMCP safely initializes MCP client with error recovery
+func (a *SimpleChatAgent) initializeMCP(mcpConfigPath string) (err error) {
+	// Add panic recovery to prevent crashes from MCP initialization
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic during MCP initialization: %v", r)
+			log.Printf("Recovered from MCP initialization panic: %v", r)
+		}
+	}()
+
+	// Use a longer timeout for initialization as npx downloads may be slow
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	// Load MCP config
+	config, err := mcpclient.LoadConfig(mcpConfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to load MCP config: %w", err)
+	}
+
+	// Create MCP client with error handling
+	client, err := mcpclient.NewClient(ctx, config)
+	if err != nil {
+		return fmt.Errorf("failed to create MCP client: %w", err)
+	}
+
+	// Get tools from MCP with timeout
+	toolsCtx, toolsCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer toolsCancel()
+
+	tools, err := mcp.MCPToTools(toolsCtx, client)
+	if err != nil {
+		// Close client if tool loading fails
+		if closeErr := a.closeMCPClient(client); closeErr != nil {
+			log.Printf("Failed to close MCP client after error: %v", closeErr)
+		}
+		return fmt.Errorf("failed to get MCP tools: %w", err)
+	}
+
+	if len(tools) == 0 {
+		log.Printf("No MCP tools found, closing client")
+		if closeErr := a.closeMCPClient(client); closeErr != nil {
+			log.Printf("Failed to close MCP client: %v", closeErr)
+		}
+		return nil
+	}
+
+	// Successfully initialized
+	a.mcpClient = client
+	a.mcpTools = tools
+	a.toolsEnabled = true
+	log.Printf("Successfully loaded %d MCP tools", len(tools))
+
+	return nil
+}
+
+// closeMCPClient safely closes an MCP client with panic recovery and timeout
+func (a *SimpleChatAgent) closeMCPClient(client *mcpclient.Client) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic during MCP client close: %v", r)
+			log.Printf("Recovered from MCP client close panic: %v", r)
+		}
+	}()
+
+	if client == nil {
+		return nil
+	}
+
+	// Use a goroutine with timeout to prevent hanging on close
+	done := make(chan error, 1)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				done <- fmt.Errorf("panic in close goroutine: %v", r)
+			}
+		}()
+		done <- client.Close()
+	}()
+
+	// Wait for close with timeout
+	select {
+	case closeErr := <-done:
+		if closeErr != nil {
+			return fmt.Errorf("failed to close MCP client: %w", closeErr)
+		}
+		return nil
+	case <-time.After(5 * time.Second):
+		log.Printf("Warning: MCP client close timed out after 5 seconds")
+		return fmt.Errorf("MCP client close timed out")
+	}
+}
+
+// Close releases resources held by the agent
+func (a *SimpleChatAgent) Close() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	log.Printf("Closing agent and cleaning up resources...")
+
+	if a.mcpClient != nil {
+		log.Printf("Closing MCP client...")
+		if err := a.closeMCPClient(a.mcpClient); err != nil {
+			// Log error but don't return - we want to continue cleanup
+			log.Printf("Error closing MCP client (continuing cleanup): %v", err)
+		}
+		a.mcpClient = nil
+		a.mcpTools = nil
+		log.Printf("MCP client closed and cleared")
+	}
+
+	return nil
 }
 
 // getToolsInfo returns a formatted string of available tools
@@ -546,9 +642,31 @@ func (cs *ChatServer) handleDeleteSession(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Delete agent
+	// Close and delete agent
 	cs.agentMu.Lock()
-	delete(cs.agents, sessionID)
+	if agent, exists := cs.agents[sessionID]; exists {
+		// Close agent if it implements Close method
+		log.Printf("Closing agent for deleted session %s", sessionID)
+		if simpleAgent, ok := agent.(*SimpleChatAgent); ok {
+			// Use a goroutine with timeout to prevent blocking
+			done := make(chan error, 1)
+			go func() {
+				done <- simpleAgent.Close()
+			}()
+
+			// Wait for close with timeout
+			select {
+			case err := <-done:
+				if err != nil {
+					log.Printf("Error closing agent for session %s: %v", sessionID, err)
+				}
+			case <-time.After(10 * time.Second):
+				log.Printf("Warning: Agent close for session %s timed out", sessionID)
+			}
+		}
+		delete(cs.agents, sessionID)
+		log.Printf("Agent for session %s deleted", sessionID)
+	}
 	cs.agentMu.Unlock()
 
 	// Delete session
@@ -822,6 +940,38 @@ func (cs *ChatServer) handleConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Close gracefully shuts down the server and cleans up all resources
+func (cs *ChatServer) Close() error {
+	log.Printf("Shutting down chat server...")
+
+	cs.agentMu.Lock()
+	defer cs.agentMu.Unlock()
+
+	// Close all agents with error collection
+	var closeErrors []error
+	for sessionID, agent := range cs.agents {
+		log.Printf("Closing agent for session %s", sessionID)
+		if simpleAgent, ok := agent.(*SimpleChatAgent); ok {
+			if err := simpleAgent.Close(); err != nil {
+				log.Printf("Error closing agent for session %s: %v", sessionID, err)
+				closeErrors = append(closeErrors, fmt.Errorf("session %s: %w", sessionID, err))
+			}
+		}
+	}
+
+	// Clear agents map
+	cs.agents = make(map[string]ChatAgent)
+
+	if len(closeErrors) > 0 {
+		log.Printf("Chat server shutdown completed with %d errors", len(closeErrors))
+		// Return first error but log all
+		return closeErrors[0]
+	}
+
+	log.Printf("Chat server shutdown complete")
+	return nil
+}
+
 // Start starts the HTTP server
 func (cs *ChatServer) Start() error {
 	http.HandleFunc("/", cs.handleIndex)
@@ -1071,7 +1221,44 @@ func main() {
 		log.Fatalf("Failed to create server: %v", err)
 	}
 
-	if err := server.Start(); err != nil {
-		log.Fatalf("Server failed: %v", err)
+	// Setup graceful shutdown
+	serverErr := make(chan error, 1)
+	go func() {
+		if err := server.Start(); err != nil {
+			serverErr <- err
+		}
+	}()
+
+	// Wait for interrupt signal or server error
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	// Block until signal received or server error
+	select {
+	case sig := <-sigChan:
+		log.Printf("Received shutdown signal: %v", sig)
+	case err := <-serverErr:
+		log.Printf("Server error: %v", err)
+	}
+
+	// Graceful shutdown with timeout
+	log.Println("Starting graceful shutdown...")
+	shutdownDone := make(chan error, 1)
+	go func() {
+		shutdownDone <- server.Close()
+	}()
+
+	// Wait for shutdown to complete with timeout
+	select {
+	case err := <-shutdownDone:
+		if err != nil {
+			log.Printf("Error during shutdown: %v", err)
+			os.Exit(1)
+		}
+		log.Println("Shutdown complete")
+		os.Exit(0)
+	case <-time.After(15 * time.Second):
+		log.Println("Shutdown timed out after 15 seconds, forcing exit")
+		os.Exit(1)
 	}
 }
