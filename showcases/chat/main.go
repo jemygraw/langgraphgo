@@ -119,29 +119,97 @@ func (a *SimpleChatAgent) Chat(ctx context.Context, message string) (string, err
 	}
 	a.messages = append(a.messages, userMsg)
 
-	// Check if any tool should be used based on the message
+	// If tools are enabled, try to use them intelligently
 	toolUsed := false
-	if a.toolsEnabled {
-		// Simple keyword matching for tool usage
-		for _, tool := range a.mcpTools {
-			if strings.Contains(strings.ToLower(message), strings.ToLower(tool.Name())) {
-				// Try to call the tool
-				result, err := tool.Call(ctx, "{}") // Empty args for now
-				if err != nil {
-					log.Printf("Tool call failed: %v", err)
-					continue
-				}
-				toolUsed = true
+	if a.toolsEnabled && len(a.mcpTools) > 0 {
+		// Create a prompt to help LLM decide if and which tool to use
+		toolsInfo := a.getToolsInfo()
+		toolDecisionPrompt := fmt.Sprintf(`Based on the user's message, determine if any of the available tools should be used.
 
-				// Add tool result to conversation
-				toolMsg := llms.MessageContent{
-					Role: llms.ChatMessageTypeTool,
-					Parts: []llms.ContentPart{
-						llms.TextPart(fmt.Sprintf("Used %s tool. Result: %s", tool.Name(), result)),
-					},
+Available tools:
+%s
+
+User message: %s
+
+Respond with a JSON object:
+- If no tool is needed: {"use_tool": false, "reason": "reason why no tool is needed"}
+- If a tool is needed: {"use_tool": true, "tool_name": "exact tool name", "args": {param: "value"}, "reason": "why this tool is appropriate"}
+
+Only use tools that are directly relevant to the user's request.
+
+IMPORTANT: Return ONLY valid JSON. 
+- Do NOT use markdown code fences (`+"```"+`)
+- Do NOT use `+"```"+`json wrapper
+- Return raw JSON object directly
+- No additional formatting or explanations
+`, toolsInfo, message)
+
+		// Create a temporary LLM call for tool decision
+		tempMsg := []llms.MessageContent{
+			{Role: llms.ChatMessageTypeSystem, Parts: []llms.ContentPart{llms.TextPart("You are a helpful assistant that decides when to use tools. Respond only with valid JSON.")}},
+			{Role: llms.ChatMessageTypeHuman, Parts: []llms.ContentPart{llms.TextPart(toolDecisionPrompt)}},
+		}
+
+		decisionResp, err := a.llm.GenerateContent(ctx, tempMsg)
+		if err == nil && len(decisionResp.Choices) > 0 {
+			decision := decisionResp.Choices[0].Content
+			log.Printf("LLM tool decision: %s", decision)
+
+			// Clean up the decision - remove markdown code block markers if present
+			cleanDecision := strings.TrimSpace(decision)
+			if strings.HasPrefix(cleanDecision, "```json") {
+				cleanDecision = strings.TrimPrefix(cleanDecision, "```json")
+				cleanDecision = strings.TrimSuffix(cleanDecision, "```")
+				cleanDecision = strings.TrimSpace(cleanDecision)
+			} else if strings.HasPrefix(cleanDecision, "```") {
+				cleanDecision = strings.TrimPrefix(cleanDecision, "```")
+				cleanDecision = strings.TrimSuffix(cleanDecision, "```")
+				cleanDecision = strings.TrimSpace(cleanDecision)
+			}
+
+			// Try to parse the decision
+			var decisionData struct {
+				UseTool  bool            `json:"use_tool"`
+				ToolName string          `json:"tool_name"`
+				Args     json.RawMessage `json:"args"`
+				Reason   string          `json:"reason"`
+			}
+
+			err = json.Unmarshal([]byte(cleanDecision), &decisionData)
+			if err == nil && decisionData.UseTool {
+				// Find the tool
+				for _, tool := range a.mcpTools {
+					if strings.EqualFold(tool.Name(), decisionData.ToolName) {
+						// Prepare arguments
+						var argsStr string
+						if len(decisionData.Args) > 0 {
+							argsStr = string(decisionData.Args)
+						} else {
+							argsStr = "{}"
+						}
+
+						// Call the tool
+						result, err := tool.Call(ctx, argsStr)
+						if err != nil {
+							log.Printf("Tool %s call failed: %v", tool.Name(), err)
+						} else {
+							toolUsed = true
+							log.Printf("Successfully called tool %s with args: %s", tool.Name(), argsStr)
+
+							// Add tool call and result to conversation
+							toolCallMsg := llms.MessageContent{
+								Role: llms.ChatMessageTypeSystem,
+								Parts: []llms.ContentPart{
+									llms.TextPart(fmt.Sprintf("I used the %s tool because: %s\n\nTool result: %s", tool.Name(), decisionData.Reason, result)),
+								},
+							}
+							a.messages = append(a.messages, toolCallMsg)
+						}
+						break
+					}
 				}
-				a.messages = append(a.messages, toolMsg)
-				break
+			} else {
+				log.Printf("failed to unmarshal decision: %v", err)
 			}
 		}
 	}
@@ -156,10 +224,6 @@ func (a *SimpleChatAgent) Chat(ctx context.Context, message string) (string, err
 	var responseText string
 	if response != nil && len(response.Choices) > 0 {
 		responseText = response.Choices[0].Content
-	}
-
-	if responseText == "" {
-		return "", fmt.Errorf("empty response from LLM")
 	}
 
 	// If a tool was used, prepend that information to the response

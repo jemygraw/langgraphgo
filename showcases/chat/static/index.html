@@ -5,10 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LangGraphGo 聊天应用</title>
-    <script src="https://cdn.bootcdn.net/ajax/libs/marked/11.1.1/marked.min.js"></script>
+    <link rel="preload" href="https://cdn.bootcdn.net/ajax/libs/marked/11.1.1/marked.min.js" as="script">
+    <link rel="preload" href="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/highlight.min.js" as="script">
+    <link rel="preload" href="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js" as="script">
+    <link rel="preload" href="https://cdn.bootcdn.net/ajax/libs/mathjax/3.2.2/es5/tex-svg.js" as="script">
+
+    <script src="https://cdn.bootcdn.net/ajax/libs/marked/11.1.1/marked.min.js" defer></script>
     <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/styles/default.min.css">
-    <script src="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js" defer></script>
     <script>
         MathJax = {
             tex: {
@@ -21,7 +26,7 @@
             }
         };
     </script>
-    <script src="https://cdn.bootcdn.net/ajax/libs/mathjax/3.2.2/es5/tex-svg.js" id="MathJax-script"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/mathjax/3.2.2/es5/tex-svg.js" id="MathJax-script" defer></script>
     <style>
         * {
             margin: 0;
@@ -1079,7 +1084,7 @@
                 <button class="new-chat-btn" onclick="createNewSession(false)">+ 新建聊天</button>
             </div>
             <div class="sessions-list" id="sessions-list">
-                <!-- Sessions will be loaded here -->
+                <p style="padding: 20px; text-align: center; color: #7f8c8d;">加载中...</p>
             </div>
         </div>
 
@@ -1141,23 +1146,6 @@
     </div>
 
     <script>
-        mermaid.initialize({
-            startOnLoad: false,
-            theme: 'base',
-            themeVariables: {
-                primaryColor: '#10b981',
-                primaryTextColor: '#2c3e50',
-                primaryBorderColor: '#e2e8f0',
-                lineColor: '#64748b',
-                secondaryColor: '#f0fdf4',
-                tertiaryColor: '#f8fafc',
-                background: '#ffffff',
-                mainBkg: '#ffffff',
-                secondBkg: '#f8fafc',
-                tertiaryBkg: '#f0fdf4'
-            }
-        });
-
         let currentSessionId = null;
         let mcpTools = [];
         let mcpEnabled = false;
@@ -1169,21 +1157,41 @@
                 artifactsSidebar.classList.add('collapsed');
             }
 
-            // Initialize MCP status
-            updateMCPStatus();
-
             // Add click listener to MCP status
             const mcpStatus = document.getElementById('mcp-status');
             if (mcpStatus) {
                 mcpStatus.addEventListener('click', showMCPToolsModal);
             }
+
+            // Wait for external resources to load
+            window.addEventListener('load', () => {
+                // Initialize mermaid after all resources are loaded
+                if (typeof mermaid !== 'undefined') {
+                    mermaid.initialize({
+                        startOnLoad: false,
+                        theme: 'base',
+                        themeVariables: {
+                            primaryColor: '#10b981',
+                            primaryTextColor: '#2c3e50',
+                            primaryBorderColor: '#e2e8f0',
+                            lineColor: '#64748b',
+                            secondaryColor: '#f0fdf4',
+                            tertiaryColor: '#f8fafc',
+                            background: '#ffffff',
+                            mainBkg: '#ffffff',
+                            secondBkg: '#f8fafc',
+                            tertiaryBkg: '#f0fdf4'
+                        }
+                    });
+                }
+            });
         });
         let sidebarCollapsed = false;
         let artifacts = new Map(); // Store artifacts by ID
         let currentArtifactId = null; // Track currently displayed artifact
 
-        // Load sessions on page load
-        loadSessions();
+        // Load sessions on page load - delay to improve perceived performance
+        setTimeout(loadSessions, 100);
 
         // Enable Enter key to send message
         document.getElementById('message-input').addEventListener('keypress', (e) => {
@@ -1194,17 +1202,29 @@
         });
 
         async function loadSessions() {
-            try {
-                const response = await fetch('/api/sessions');
-                const sessions = await response.json();
+            const sessionsList = document.getElementById('sessions-list');
+            // Show loading state immediately
+            if (sessionsList.children.length === 0) {
+                sessionsList.innerHTML = '<p style="padding: 20px; text-align: center; color: #7f8c8d;">加载中...</p>';
+            }
 
-                const sessionsList = document.getElementById('sessions-list');
+            try {
+                // Use a timeout to prevent long waiting
+                const response = await Promise.race([
+                    fetch('/api/sessions'),
+                    new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('Timeout')), 5000)
+                    )
+                ]);
+
+                const sessions = await response.json();
                 sessionsList.innerHTML = '';
 
                 if (sessions.length === 0) {
                     // Auto-create first session if none exists
-                    sessionsList.innerHTML = '<p style="padding: 20px; text-align: center; color: #7f8c8d;">Creating session...</p>';
-                    await createNewSession(true);
+                    sessionsList.innerHTML = '<p style="padding: 20px; text-align: center; color: #7f8c8d;">创建会话中...</p>';
+                    // Use setTimeout to not block the UI
+                    setTimeout(() => createNewSession(true), 50);
                     return;
                 }
 
@@ -1231,6 +1251,9 @@
                 });
             } catch (error) {
                 console.error('Failed to load sessions:', error);
+                if (sessionsList.innerHTML.includes('加载中')) {
+                    sessionsList.innerHTML = '<p style="padding: 20px; text-align: center; color: #e74c3c;">加载失败，请刷新页面</p>';
+                }
             }
         }
 
@@ -1601,8 +1624,11 @@
                 const language = match[1] || 'text';
                 const codeContent = match[2].trim();
 
-                // Check if this type should be extracted as artifact
-                if (artifactTypes.includes(language.toLowerCase())) {
+                // Count the number of lines in the code block
+                const lineCount = codeContent.split('\n').length;
+
+                // Check if this type should be extracted as artifact AND has more than 100 lines
+                if (artifactTypes.includes(language.toLowerCase()) && lineCount > 100) {
                     const artifactId = `artifact_${Date.now()}_${artifactIndex++}`;
                     const type = language.toLowerCase();
 
