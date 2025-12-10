@@ -12,7 +12,7 @@ import (
 	"github.com/tmc/langchaingo/llms/openai"
 )
 
-func ExampleMessageGraph() {
+func ExampleStateGraph() {
 	// Skip if no OpenAI API key is available
 	if os.Getenv("OPENAI_API_KEY") == "" {
 		fmt.Println("[{human [{What is 1 + 1?}]} {ai [{1 + 1 equals 2.}]}]")
@@ -60,18 +60,18 @@ func ExampleMessageGraph() {
 	fmt.Println(res)
 }
 
-func TestMessageGraph(t *testing.T) {
+func TestStateGraph(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name           string
-		buildGraph     func() *graph.MessageGraph
+		buildGraph     func() *graph.StateGraph
 		inputMessages  []llms.MessageContent
 		expectedOutput []llms.MessageContent
 		expectedError  error
 	}{
 		{
 			name: "Simple graph",
-			buildGraph: func() *graph.MessageGraph {
+			buildGraph: func() *graph.StateGraph {
 				g := graph.NewStateGraph()
 				g.AddNode("node1", "node1", func(_ context.Context, state interface{}) (interface{}, error) {
 					messages := state.([]llms.MessageContent)
@@ -96,7 +96,7 @@ func TestMessageGraph(t *testing.T) {
 		},
 		{
 			name: "Entry point not set",
-			buildGraph: func() *graph.MessageGraph {
+			buildGraph: func() *graph.StateGraph {
 				g := graph.NewStateGraph()
 				g.AddNode("node1", "node1", func(_ context.Context, state interface{}) (interface{}, error) {
 					return state, nil
@@ -107,7 +107,7 @@ func TestMessageGraph(t *testing.T) {
 		},
 		{
 			name: "Node not found",
-			buildGraph: func() *graph.MessageGraph {
+			buildGraph: func() *graph.StateGraph {
 				g := graph.NewStateGraph()
 				g.AddNode("node1", "node1", func(_ context.Context, state interface{}) (interface{}, error) {
 					return state, nil
@@ -120,7 +120,7 @@ func TestMessageGraph(t *testing.T) {
 		},
 		{
 			name: "No outgoing edge",
-			buildGraph: func() *graph.MessageGraph {
+			buildGraph: func() *graph.StateGraph {
 				g := graph.NewStateGraph()
 				g.AddNode("node1", "node1", func(_ context.Context, state interface{}) (interface{}, error) {
 					return state, nil
@@ -132,7 +132,7 @@ func TestMessageGraph(t *testing.T) {
 		},
 		{
 			name: "Error in node function",
-			buildGraph: func() *graph.MessageGraph {
+			buildGraph: func() *graph.StateGraph {
 				g := graph.NewStateGraph()
 				g.AddNode("node1", "node1", func(_ context.Context, _ interface{}) (interface{}, error) {
 					return nil, errors.New("node error")

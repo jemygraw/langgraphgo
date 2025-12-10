@@ -162,7 +162,7 @@ func MultiStepReasoningExample() {
 	}
 
 	// Create a multi-step reasoning graph
-	g := graph.NewCheckpointableMessageGraph()
+	g := graph.NewCheckpointableStateGraph()
 
 	// Step 1: Analyze the problem
 	g.AddNode("analyze", "analyze", func(ctx context.Context, state interface{}) (interface{}, error) {

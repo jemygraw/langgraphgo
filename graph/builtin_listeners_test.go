@@ -347,7 +347,7 @@ func TestBuiltinListeners_Integration(t *testing.T) {
 	t.Parallel()
 
 	// Create graph
-	g := graph.NewListenableMessageGraph()
+	g := graph.NewListenableStateGraph()
 
 	node1 := g.AddNode("step1", "step1", func(_ context.Context, _ interface{}) (interface{}, error) {
 		return "step1_result", nil

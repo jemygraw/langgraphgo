@@ -8,12 +8,12 @@ import (
 // Subgraph represents a nested graph that can be used as a node
 type Subgraph struct {
 	name     string
-	graph    *MessageGraph
+	graph    *StateGraph
 	runnable *Runnable
 }
 
 // NewSubgraph creates a new subgraph
-func NewSubgraph(name string, graph *MessageGraph) (*Subgraph, error) {
+func NewSubgraph(name string, graph *StateGraph) (*Subgraph, error) {
 	runnable, err := graph.Compile()
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile subgraph %s: %w", name, err)
@@ -36,7 +36,7 @@ func (s *Subgraph) Execute(ctx context.Context, state interface{}) (interface{},
 }
 
 // AddSubgraph adds a subgraph as a node in the parent graph
-func (g *MessageGraph) AddSubgraph(name string, subgraph *MessageGraph) error {
+func (g *StateGraph) AddSubgraph(name string, subgraph *StateGraph) error {
 	sg, err := NewSubgraph(name, subgraph)
 	if err != nil {
 		return err
@@ -47,28 +47,28 @@ func (g *MessageGraph) AddSubgraph(name string, subgraph *MessageGraph) error {
 }
 
 // CreateSubgraph creates and adds a subgraph using a builder function
-func (g *MessageGraph) CreateSubgraph(name string, builder func(*MessageGraph)) error {
-	subgraph := NewMessageGraph()
+func (g *StateGraph) CreateSubgraph(name string, builder func(*StateGraph)) error {
+	subgraph := NewStateGraph()
 	builder(subgraph)
 	return g.AddSubgraph(name, subgraph)
 }
 
 // CompositeGraph allows composing multiple graphs together
 type CompositeGraph struct {
-	graphs map[string]*MessageGraph
-	main   *MessageGraph
+	graphs map[string]*StateGraph
+	main   *StateGraph
 }
 
 // NewCompositeGraph creates a new composite graph
 func NewCompositeGraph() *CompositeGraph {
 	return &CompositeGraph{
-		graphs: make(map[string]*MessageGraph),
-		main:   NewMessageGraph(),
+		graphs: make(map[string]*StateGraph),
+		main:   NewStateGraph(),
 	}
 }
 
 // AddGraph adds a named graph to the composite
-func (cg *CompositeGraph) AddGraph(name string, graph *MessageGraph) {
+func (cg *CompositeGraph) AddGraph(name string, graph *StateGraph) {
 	cg.graphs[name] = graph
 }
 
@@ -108,7 +108,7 @@ func (cg *CompositeGraph) Compile() (*Runnable, error) {
 // RecursiveSubgraph allows a subgraph to call itself recursively
 type RecursiveSubgraph struct {
 	name      string
-	graph     *MessageGraph
+	graph     *StateGraph
 	maxDepth  int
 	condition func(interface{}, int) bool // Should continue recursion?
 }
@@ -121,7 +121,7 @@ func NewRecursiveSubgraph(
 ) *RecursiveSubgraph {
 	return &RecursiveSubgraph{
 		name:      name,
-		graph:     NewMessageGraph(),
+		graph:     NewStateGraph(),
 		maxDepth:  maxDepth,
 		condition: condition,
 	}
@@ -159,11 +159,11 @@ func (rs *RecursiveSubgraph) executeRecursive(ctx context.Context, state interfa
 }
 
 // AddRecursiveSubgraph adds a recursive subgraph to the parent graph
-func (g *MessageGraph) AddRecursiveSubgraph(
+func (g *StateGraph) AddRecursiveSubgraph(
 	name string,
 	maxDepth int,
 	condition func(interface{}, int) bool,
-	builder func(*MessageGraph),
+	builder func(*StateGraph),
 ) {
 	rs := NewRecursiveSubgraph(name, maxDepth, condition)
 	builder(rs.graph)
@@ -171,10 +171,10 @@ func (g *MessageGraph) AddRecursiveSubgraph(
 }
 
 // NestedConditionalSubgraph creates a subgraph with its own conditional routing
-func (g *MessageGraph) AddNestedConditionalSubgraph(
+func (g *StateGraph) AddNestedConditionalSubgraph(
 	name string,
 	router func(interface{}) string,
-	subgraphs map[string]*MessageGraph,
+	subgraphs map[string]*StateGraph,
 ) error {
 	// Create a wrapper node that routes to different subgraphs
 	g.AddNode(name, "Nested conditional subgraph: "+name, func(ctx context.Context, state interface{}) (interface{}, error) {

@@ -26,7 +26,7 @@ func main() {
 	fmt.Printf("Using SQLite database at: %s\n", dbPath)
 
 	// Create a checkpointable graph
-	g := graph.NewCheckpointableMessageGraph()
+	g := graph.NewCheckpointableStateGraph()
 
 	// Initialize Sqlite Checkpoint Store
 	store, err := sqlite.NewSqliteCheckpointStore(sqlite.SqliteOptions{

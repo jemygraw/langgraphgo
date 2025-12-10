@@ -65,7 +65,7 @@ progressListener := graph.NewProgressListener()
 node.AddListener(progressListener)
 
 // Checkpointing
-g := graph.NewCheckpointableMessageGraph()
+g := graph.NewCheckpointableStateGraph()
 config := graph.CheckpointConfig{
     Store: graph.NewMemoryCheckpointStore(),
     AutoSave: true,

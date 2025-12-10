@@ -83,7 +83,7 @@ func (pn *ParallelNode) Execute(ctx context.Context, state interface{}) (interfa
 }
 
 // AddParallelNodes adds a set of nodes that execute in parallel
-func (g *MessageGraph) AddParallelNodes(groupName string, nodes map[string]func(context.Context, interface{}) (interface{}, error)) {
+func (g *StateGraph) AddParallelNodes(groupName string, nodes map[string]func(context.Context, interface{}) (interface{}, error)) {
 	// Create parallel node group
 	parallelNodes := make([]Node, 0, len(nodes))
 	for name, fn := range nodes {
@@ -132,7 +132,7 @@ func (mr *MapReduceNode) Execute(ctx context.Context, state interface{}) (interf
 }
 
 // AddMapReduceNode adds a map-reduce pattern node
-func (g *MessageGraph) AddMapReduceNode(
+func (g *StateGraph) AddMapReduceNode(
 	name string,
 	mapFunctions map[string]func(context.Context, interface{}) (interface{}, error),
 	reducer func([]interface{}) (interface{}, error),
@@ -152,7 +152,7 @@ func (g *MessageGraph) AddMapReduceNode(
 }
 
 // FanOutFanIn creates a fan-out/fan-in pattern
-func (g *MessageGraph) FanOutFanIn(
+func (g *StateGraph) FanOutFanIn(
 	source string,
 	_ []string, // workers parameter kept for API compatibility
 	collector string,

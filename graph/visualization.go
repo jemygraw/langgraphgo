@@ -8,11 +8,11 @@ import (
 
 // Exporter provides methods to export graphs in different formats
 type Exporter struct {
-	graph *MessageGraph
+	graph *StateGraph
 }
 
 // NewExporter creates a new graph exporter for the given graph
-func NewExporter(graph *MessageGraph) *Exporter {
+func NewExporter(graph *StateGraph) *Exporter {
 	return &Exporter{graph: graph}
 }
 

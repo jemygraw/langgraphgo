@@ -73,22 +73,18 @@ type Edge struct {
 // StateMerger merges multiple state updates into a single state.
 type StateMerger func(ctx context.Context, currentState interface{}, newStates []interface{}) (interface{}, error)
 
-// MessageGraph is an alias for StateGraph for backward compatibility.
-// All MessageGraph functionality is now provided by StateGraph.
-type MessageGraph = StateGraph
-
 // Runnable is an alias for StateRunnable for backward compatibility.
 // All Runnable functionality is now provided by StateRunnable.
 type Runnable = StateRunnable
 
-// NewMessageGraph creates a new instance of MessageGraph with a default schema
+// NewMessageGraph creates a new instance of StateGraph with a default schema
 // that handles "messages" using the AddMessages reducer.
 // This is the recommended constructor for chat-based agents that use
 // map[string]interface{} as state with a "messages" key.
 //
 // This replaces the old NewMessageGraphWithSchema() function.
-func NewMessageGraph() *MessageGraph {
-	g := &MessageGraph{
+func NewMessageGraph() *StateGraph {
+	g := &StateGraph{
 		nodes:            make(map[string]Node),
 		conditionalEdges: make(map[string]func(ctx context.Context, state interface{}) string),
 	}

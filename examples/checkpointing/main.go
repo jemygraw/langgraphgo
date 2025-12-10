@@ -16,7 +16,7 @@ type ProcessState struct {
 
 func main() {
 	// Create a checkpointable graph
-	g := graph.NewCheckpointableMessageGraph()
+	g := graph.NewCheckpointableStateGraph()
 
 	// Configure checkpointing
 	config := graph.CheckpointConfig{

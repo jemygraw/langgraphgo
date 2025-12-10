@@ -8,7 +8,7 @@ import (
 )
 
 func TestUpdateState(t *testing.T) {
-	g := NewCheckpointableMessageGraph()
+	g := NewCheckpointableStateGraph()
 
 	// Setup schema with reducer
 	schema := NewMapSchema()

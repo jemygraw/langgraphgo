@@ -370,14 +370,11 @@ func (cl *CheckpointListener) OnGraphStep(ctx context.Context, stepNode string, 
 // or we can remove it if we don't use it as NodeListener anymore.
 // CheckpointableRunnable currently adds it as NodeListener. We should change that.
 
-// CheckpointableStateGraph extends ListenableMessageGraph with checkpointing
+// CheckpointableStateGraph extends ListenableStateGraph with checkpointing
 type CheckpointableStateGraph struct {
 	*ListenableStateGraph
 	config CheckpointConfig
 }
-
-// CheckpointableMessageGraph is an alias for CheckpointableStateGraph for backward compatibility.
-type CheckpointableMessageGraph = CheckpointableStateGraph
 
 // NewCheckpointableStateGraph creates a new checkpointable state graph
 func NewCheckpointableStateGraph() *CheckpointableStateGraph {
@@ -387,22 +384,12 @@ func NewCheckpointableStateGraph() *CheckpointableStateGraph {
 	}
 }
 
-// NewCheckpointableMessageGraph is an alias for NewCheckpointableStateGraph for backward compatibility.
-func NewCheckpointableMessageGraph() *CheckpointableMessageGraph {
-	return NewCheckpointableStateGraph()
-}
-
 // NewCheckpointableStateGraphWithConfig creates a checkpointable graph with custom config
 func NewCheckpointableStateGraphWithConfig(config CheckpointConfig) *CheckpointableStateGraph {
 	return &CheckpointableStateGraph{
 		ListenableStateGraph: NewListenableStateGraph(),
 		config:               config,
 	}
-}
-
-// NewCheckpointableMessageGraphWithConfig is an alias for NewCheckpointableStateGraphWithConfig for backward compatibility.
-func NewCheckpointableMessageGraphWithConfig(config CheckpointConfig) *CheckpointableMessageGraph {
-	return NewCheckpointableStateGraphWithConfig(config)
 }
 
 // CompileCheckpointable compiles the graph into a checkpointable runnable

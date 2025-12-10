@@ -26,7 +26,7 @@ func main() {
 	fmt.Printf("Using Redis at: %s\n", redisAddr)
 
 	// Create a checkpointable graph
-	g := graph.NewCheckpointableMessageGraph()
+	g := graph.NewCheckpointableStateGraph()
 
 	// Initialize Redis Checkpoint Store
 	store := redis.NewRedisCheckpointStore(redis.RedisOptions{

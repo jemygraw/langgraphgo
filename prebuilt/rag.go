@@ -107,7 +107,7 @@ func DefaultRAGConfig() *RAGConfig {
 // RAGPipeline represents a complete RAG pipeline
 type RAGPipeline struct {
 	config *RAGConfig
-	graph  *graph.MessageGraph
+	graph  *graph.StateGraph
 }
 
 // NewRAGPipeline creates a new RAG pipeline with the given configuration
@@ -118,7 +118,7 @@ func NewRAGPipeline(config *RAGConfig) *RAGPipeline {
 
 	return &RAGPipeline{
 		config: config,
-		graph:  graph.NewMessageGraph(),
+		graph:  graph.NewStateGraph(),
 	}
 }
 
@@ -254,7 +254,7 @@ func (p *RAGPipeline) Compile() (*graph.Runnable, error) {
 }
 
 // GetGraph returns the underlying graph for visualization
-func (p *RAGPipeline) GetGraph() *graph.MessageGraph {
+func (p *RAGPipeline) GetGraph() *graph.StateGraph {
 	return p.graph
 }
 

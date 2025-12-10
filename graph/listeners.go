@@ -198,11 +198,6 @@ func NewListenableStateGraph() *ListenableStateGraph {
 	}
 }
 
-// NewListenableMessageGraph is an alias for NewListenableStateGraph for backward compatibility.
-func NewListenableMessageGraph() *ListenableStateGraph {
-	return NewListenableStateGraph()
-}
-
 // AddNode adds a node with listener capabilities
 func (g *ListenableStateGraph) AddNode(name string, description string, fn func(ctx context.Context, state interface{}) (interface{}, error)) *ListenableNode {
 	node := Node{

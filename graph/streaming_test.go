@@ -8,7 +8,7 @@ import (
 )
 
 func TestStreamingModes(t *testing.T) {
-	g := NewStreamingMessageGraph()
+	g := NewStreamingStateGraph()
 
 	// Setup simple graph
 	g.AddNode("A", "A", func(ctx context.Context, state interface{}) (interface{}, error) {
@@ -41,10 +41,10 @@ func TestStreamingModes(t *testing.T) {
 		// Expect "graph_step" events
 		// A runs -> state "StartA"
 		// B runs -> state "StartAB"
-		// (Assuming MessageGraph appends strings by default or replaces?
-		// MessageGraph defaults to simple replacement if no schema?
-		// Wait, MessageGraph uses ListenableMessageGraph which uses MessageGraph.
-		// MessageGraph uses default Node/Edge structs.
+		// (Assuming StateGraph appends strings by default or replaces?
+		// StateGraph defaults to simple replacement if no schema?
+		// Wait, StateGraph uses ListenableStateGraph which uses StateGraph.
+		// StateGraph uses default Node/Edge structs.
 		// It does NOT have a default schema/reducer unless set.
 		// If no schema/merger, parallel execution takes last result.
 		// Sequential A->B: A returns "A". State becomes "A".

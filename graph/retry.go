@@ -95,7 +95,7 @@ func (rn *RetryNode) Execute(ctx context.Context, state interface{}) (interface{
 }
 
 // AddNodeWithRetry adds a node with retry logic
-func (g *MessageGraph) AddNodeWithRetry(
+func (g *StateGraph) AddNodeWithRetry(
 	name string,
 	description string,
 	fn func(context.Context, interface{}) (interface{}, error),
@@ -153,7 +153,7 @@ func (tn *TimeoutNode) Execute(ctx context.Context, state interface{}) (interfac
 }
 
 // AddNodeWithTimeout adds a node with timeout
-func (g *MessageGraph) AddNodeWithTimeout(
+func (g *StateGraph) AddNodeWithTimeout(
 	name string,
 	description string,
 	fn func(context.Context, interface{}) (interface{}, error),
@@ -256,7 +256,7 @@ func (cb *CircuitBreaker) Execute(ctx context.Context, state interface{}) (inter
 }
 
 // AddNodeWithCircuitBreaker adds a node with circuit breaker
-func (g *MessageGraph) AddNodeWithCircuitBreaker(
+func (g *StateGraph) AddNodeWithCircuitBreaker(
 	name string,
 	description string,
 	fn func(context.Context, interface{}) (interface{}, error),
@@ -318,7 +318,7 @@ func (rl *RateLimiter) Execute(ctx context.Context, state interface{}) (interfac
 }
 
 // AddNodeWithRateLimit adds a node with rate limiting
-func (g *MessageGraph) AddNodeWithRateLimit(
+func (g *StateGraph) AddNodeWithRateLimit(
 	name string,
 	description string,
 	fn func(context.Context, interface{}) (interface{}, error),

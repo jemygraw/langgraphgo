@@ -28,7 +28,7 @@ func main() {
 	}
 
 	// Create a checkpointable graph
-	g := graph.NewCheckpointableMessageGraph()
+	g := graph.NewCheckpointableStateGraph()
 
 	// Initialize Postgres Checkpoint Store
 	store, err := postgres.NewPostgresCheckpointStore(context.Background(), postgres.PostgresOptions{

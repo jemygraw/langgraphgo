@@ -132,7 +132,7 @@ func main() {
 	fmt.Println("\n=== USING BUILDER FUNCTION ===")
 
 	main2 := graph.NewStateGraph()
-	err = main2.CreateSubgraph("simple_sub", func(sg *graph.MessageGraph) {
+	err = main2.CreateSubgraph("simple_sub", func(sg *graph.StateGraph) {
 		sg.AddNode("step1", "step1", func(ctx context.Context, state interface{}) (interface{}, error) {
 			return fmt.Sprintf("%v → step1", state), nil
 		})

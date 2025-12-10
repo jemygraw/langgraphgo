@@ -10,7 +10,7 @@ import (
 
 func main() {
 	// Create streaming graph
-	g := graph.NewStreamingMessageGraph()
+	g := graph.NewStreamingStateGraph()
 
 	// Add nodes with listeners
 	analyze := g.AddNode("analyze", "analyze", func(ctx context.Context, state interface{}) (interface{}, error) {

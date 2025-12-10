@@ -96,7 +96,7 @@ func main() {
 	threadID := "durable-job-1"
 
 	// 1. Define Graph
-	g := graph.NewCheckpointableMessageGraph()
+	g := graph.NewCheckpointableStateGraph()
 	// Use MapSchema for state
 	schema := graph.NewMapSchema()
 	schema.RegisterReducer("steps", graph.AppendReducer)

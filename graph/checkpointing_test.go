@@ -263,7 +263,7 @@ func TestCheckpointableRunnable_Basic(t *testing.T) {
 	t.Parallel()
 
 	// Create graph
-	g := graph.NewListenableMessageGraph()
+	g := graph.NewListenableStateGraph()
 
 	g.AddNode("step1", "step1", func(ctx context.Context, state interface{}) (interface{}, error) {
 		return "step1_result", nil
@@ -330,7 +330,7 @@ func TestCheckpointableRunnable_Basic(t *testing.T) {
 func TestCheckpointableRunnable_ManualCheckpoint(t *testing.T) {
 	t.Parallel()
 
-	g := graph.NewListenableMessageGraph()
+	g := graph.NewListenableStateGraph()
 	g.AddNode(testNode, testNode, func(ctx context.Context, state interface{}) (interface{}, error) {
 		return testResult, nil
 	})
@@ -375,7 +375,7 @@ func TestCheckpointableRunnable_ManualCheckpoint(t *testing.T) {
 func TestCheckpointableRunnable_LoadCheckpoint(t *testing.T) {
 	t.Parallel()
 
-	g := graph.NewListenableMessageGraph()
+	g := graph.NewListenableStateGraph()
 	g.AddNode(testNode, testNode, func(ctx context.Context, state interface{}) (interface{}, error) {
 		return testResult, nil
 	})
@@ -423,7 +423,7 @@ func TestCheckpointableRunnable_LoadCheckpoint(t *testing.T) {
 func TestCheckpointableRunnable_ClearCheckpoints(t *testing.T) {
 	t.Parallel()
 
-	g := graph.NewListenableMessageGraph()
+	g := graph.NewListenableStateGraph()
 	g.AddNode(testNode, testNode, func(ctx context.Context, state interface{}) (interface{}, error) {
 		return testResult, nil
 	})
@@ -478,10 +478,10 @@ func TestCheckpointableRunnable_ClearCheckpoints(t *testing.T) {
 	}
 }
 
-func TestCheckpointableMessageGraph_CompileCheckpointable(t *testing.T) {
+func TestCheckpointableStateGraph_CompileCheckpointable(t *testing.T) {
 	t.Parallel()
 
-	g := graph.NewCheckpointableMessageGraph()
+	g := graph.NewCheckpointableStateGraph()
 
 	g.AddNode(testNode, testNode, func(ctx context.Context, state interface{}) (interface{}, error) {
 		return testResult, nil
@@ -505,7 +505,7 @@ func TestCheckpointableMessageGraph_CompileCheckpointable(t *testing.T) {
 	}
 }
 
-func TestCheckpointableMessageGraph_CustomConfig(t *testing.T) {
+func TestCheckpointableStateGraph_CustomConfig(t *testing.T) {
 	t.Parallel()
 
 	store := graph.NewMemoryCheckpointStore()
@@ -516,7 +516,7 @@ func TestCheckpointableMessageGraph_CustomConfig(t *testing.T) {
 		MaxCheckpoints: 5,
 	}
 
-	g := graph.NewCheckpointableMessageGraphWithConfig(config)
+	g := graph.NewCheckpointableStateGraphWithConfig(config)
 
 	// Verify config is set
 	actualConfig := g.GetCheckpointConfig()
@@ -540,7 +540,7 @@ func TestCheckpointing_Integration(t *testing.T) {
 	t.Parallel()
 
 	// Create checkpointable graph
-	g := graph.NewCheckpointableMessageGraph()
+	g := graph.NewCheckpointableStateGraph()
 
 	// Build a multi-step pipeline
 	g.AddNode("analyze", "analyze", func(ctx context.Context, state interface{}) (interface{}, error) {
@@ -650,7 +650,7 @@ func TestCheckpointing_Integration(t *testing.T) {
 func TestCheckpointListener_ErrorHandling(t *testing.T) {
 	t.Parallel()
 
-	g := graph.NewListenableMessageGraph()
+	g := graph.NewListenableStateGraph()
 
 	// Node that will fail
 	g.AddNode("failing_node", "failing_node", func(ctx context.Context, state interface{}) (interface{}, error) {

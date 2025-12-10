@@ -20,13 +20,13 @@ func TestEmptyGraph(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		buildGraph  func() *graph.MessageGraph
+		buildGraph  func() *graph.StateGraph
 		expectError bool
 		errorMsg    string
 	}{
 		{
 			name: "Graph with no nodes",
-			buildGraph: func() *graph.MessageGraph {
+			buildGraph: func() *graph.StateGraph {
 				g := graph.NewStateGraph()
 				return g
 			},
@@ -35,7 +35,7 @@ func TestEmptyGraph(t *testing.T) {
 		},
 		{
 			name: "Graph with nodes but no entry point",
-			buildGraph: func() *graph.MessageGraph {
+			buildGraph: func() *graph.StateGraph {
 				g := graph.NewStateGraph()
 				g.AddNode("node1", "node1", func(ctx context.Context, state interface{}) (interface{}, error) {
 					return state, nil
@@ -47,7 +47,7 @@ func TestEmptyGraph(t *testing.T) {
 		},
 		{
 			name: "Graph with self-referencing node",
-			buildGraph: func() *graph.MessageGraph {
+			buildGraph: func() *graph.StateGraph {
 				g := graph.NewStateGraph()
 				g.AddNode("node1", "node1", func(ctx context.Context, state interface{}) (interface{}, error) {
 					return state, nil
@@ -382,13 +382,13 @@ func TestStateModification(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		buildGraph     func() *graph.MessageGraph
+		buildGraph     func() *graph.StateGraph
 		initialState   interface{}
 		expectedResult interface{}
 	}{
 		{
 			name: "Accumulator pattern",
-			buildGraph: func() *graph.MessageGraph {
+			buildGraph: func() *graph.StateGraph {
 				g := graph.NewStateGraph()
 				g.AddNode("accumulate", "accumulate", func(ctx context.Context, state interface{}) (interface{}, error) {
 					acc := state.([]int)
@@ -409,7 +409,7 @@ func TestStateModification(t *testing.T) {
 		},
 		{
 			name: "Map transformation",
-			buildGraph: func() *graph.MessageGraph {
+			buildGraph: func() *graph.StateGraph {
 				g := graph.NewStateGraph()
 				g.AddNode("transform", "transform", func(ctx context.Context, state interface{}) (interface{}, error) {
 					m := state.(map[string]interface{})

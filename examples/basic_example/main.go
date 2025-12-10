@@ -41,7 +41,7 @@ func runBasicExample() {
 func runStreamingExample() {
 	fmt.Println("\n2️⃣ Streaming with Listeners")
 
-	g := graph.NewListenableMessageGraph()
+	g := graph.NewListenableStateGraph()
 
 	node := g.AddNode("stream_process", "stream_process", func(ctx context.Context, state interface{}) (interface{}, error) {
 		time.Sleep(100 * time.Millisecond) // Simulate work
@@ -65,7 +65,7 @@ func runStreamingExample() {
 func runCheckpointingExample() {
 	fmt.Println("\n3️⃣ Checkpointing Example")
 
-	g := graph.NewCheckpointableMessageGraph()
+	g := graph.NewCheckpointableStateGraph()
 
 	g.AddNode("checkpoint_step1", "checkpoint_step1", func(ctx context.Context, state interface{}) (interface{}, error) {
 		data := state.(map[string]interface{})

@@ -357,30 +357,30 @@ func (sr *StreamingRunnable) Stream(ctx context.Context, initialState interface{
 	}
 }
 
-// StreamingMessageGraph extends ListenableMessageGraph with streaming capabilities
-type StreamingMessageGraph struct {
+// StreamingStateGraph extends ListenableStateGraph with streaming capabilities
+type StreamingStateGraph struct {
 	*ListenableStateGraph
 	config StreamConfig
 }
 
-// NewStreamingMessageGraph creates a new streaming message graph
-func NewStreamingMessageGraph() *StreamingMessageGraph {
-	return &StreamingMessageGraph{
-		ListenableStateGraph: NewListenableMessageGraph(),
+// NewStreamingStateGraph creates a new streaming message graph
+func NewStreamingStateGraph() *StreamingStateGraph {
+	return &StreamingStateGraph{
+		ListenableStateGraph: NewListenableStateGraph(),
 		config:               DefaultStreamConfig(),
 	}
 }
 
-// NewStreamingMessageGraphWithConfig creates a streaming graph with custom config
-func NewStreamingMessageGraphWithConfig(config StreamConfig) *StreamingMessageGraph {
-	return &StreamingMessageGraph{
-		ListenableStateGraph: NewListenableMessageGraph(),
+// NewStreamingStateGraphWithConfig creates a streaming graph with custom config
+func NewStreamingStateGraphWithConfig(config StreamConfig) *StreamingStateGraph {
+	return &StreamingStateGraph{
+		ListenableStateGraph: NewListenableStateGraph(),
 		config:               config,
 	}
 }
 
 // CompileStreaming compiles the graph into a streaming runnable
-func (g *StreamingMessageGraph) CompileStreaming() (*StreamingRunnable, error) {
+func (g *StreamingStateGraph) CompileStreaming() (*StreamingRunnable, error) {
 	listenableRunnable, err := g.CompileListenable()
 	if err != nil {
 		return nil, err
@@ -390,12 +390,12 @@ func (g *StreamingMessageGraph) CompileStreaming() (*StreamingRunnable, error) {
 }
 
 // SetStreamConfig updates the streaming configuration
-func (g *StreamingMessageGraph) SetStreamConfig(config StreamConfig) {
+func (g *StreamingStateGraph) SetStreamConfig(config StreamConfig) {
 	g.config = config
 }
 
 // GetStreamConfig returns the current streaming configuration
-func (g *StreamingMessageGraph) GetStreamConfig() StreamConfig {
+func (g *StreamingStateGraph) GetStreamConfig() StreamConfig {
 	return g.config
 }
 

@@ -13,7 +13,7 @@ import (
 // We stream updates from the graph execution.
 
 func main() {
-	g := graph.NewStreamingMessageGraph()
+	g := graph.NewStreamingStateGraph()
 
 	g.AddNode("step_1", "step_1", func(ctx context.Context, state interface{}) (interface{}, error) {
 		time.Sleep(500 * time.Millisecond) // Simulate work

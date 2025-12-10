@@ -15,14 +15,14 @@ func TestConditionalEdges(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		buildGraph     func() *graph.MessageGraph
+		buildGraph     func() *graph.StateGraph
 		initialState   interface{}
 		expectedResult interface{}
 		expectError    bool
 	}{
 		{
 			name: "Simple conditional routing based on content",
-			buildGraph: func() *graph.MessageGraph {
+			buildGraph: func() *graph.StateGraph {
 				g := graph.NewStateGraph()
 
 				// Add nodes
@@ -73,7 +73,7 @@ func TestConditionalEdges(t *testing.T) {
 		},
 		{
 			name: "Conditional routing to general path",
-			buildGraph: func() *graph.MessageGraph {
+			buildGraph: func() *graph.StateGraph {
 				g := graph.NewStateGraph()
 
 				g.AddNode("start", "start", func(ctx context.Context, state interface{}) (interface{}, error) {
@@ -120,7 +120,7 @@ func TestConditionalEdges(t *testing.T) {
 		},
 		{
 			name: "Multi-level conditional routing",
-			buildGraph: func() *graph.MessageGraph {
+			buildGraph: func() *graph.StateGraph {
 				g := graph.NewStateGraph()
 
 				g.AddNode("router", "router", func(ctx context.Context, state interface{}) (interface{}, error) {
@@ -167,7 +167,7 @@ func TestConditionalEdges(t *testing.T) {
 		},
 		{
 			name: "Conditional edge to END",
-			buildGraph: func() *graph.MessageGraph {
+			buildGraph: func() *graph.StateGraph {
 				g := graph.NewStateGraph()
 
 				g.AddNode("check", "check", func(ctx context.Context, state interface{}) (interface{}, error) {

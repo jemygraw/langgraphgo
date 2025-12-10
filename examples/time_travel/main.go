@@ -13,7 +13,7 @@ import (
 
 func main() {
 	// 1. Setup Checkpointable Graph
-	g := graph.NewCheckpointableMessageGraph()
+	g := graph.NewCheckpointableStateGraph()
 
 	// Schema with integer reducer
 	schema := graph.NewMapSchema()

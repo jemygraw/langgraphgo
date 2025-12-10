@@ -210,10 +210,10 @@ func TestListenableNode_ExecuteWithError(t *testing.T) {
 	}
 }
 
-func TestListenableMessageGraph_AddNode(t *testing.T) {
+func TestListenableStateGraph_AddNode(t *testing.T) {
 	t.Parallel()
 
-	g := graph.NewListenableMessageGraph()
+	g := graph.NewListenableStateGraph()
 
 	// Add a node
 	node := g.AddNode(testNode, testNode, func(ctx context.Context, state interface{}) (interface{}, error) {
@@ -236,10 +236,10 @@ func TestListenableMessageGraph_AddNode(t *testing.T) {
 	}
 }
 
-func TestListenableMessageGraph_GlobalListeners(t *testing.T) {
+func TestListenableStateGraph_GlobalListeners(t *testing.T) {
 	t.Parallel()
 
-	g := graph.NewListenableMessageGraph()
+	g := graph.NewListenableStateGraph()
 
 	// Add multiple nodes
 	node1 := g.AddNode("node1", "node1", func(ctx context.Context, state interface{}) (interface{}, error) {
@@ -291,7 +291,7 @@ func TestListenableMessageGraph_GlobalListeners(t *testing.T) {
 func TestListenableRunnable_Invoke(t *testing.T) {
 	t.Parallel()
 
-	g := graph.NewListenableMessageGraph()
+	g := graph.NewListenableStateGraph()
 
 	// Create a simple pipeline
 	node1 := g.AddNode("node1", "node1", func(ctx context.Context, state interface{}) (interface{}, error) {
@@ -484,7 +484,7 @@ func BenchmarkListenableNode_Execute(b *testing.B) {
 }
 
 func BenchmarkListenableRunnable_Invoke(b *testing.B) {
-	g := graph.NewListenableMessageGraph()
+	g := graph.NewListenableStateGraph()
 
 	node := g.AddNode("node", "node", func(ctx context.Context, state interface{}) (interface{}, error) {
 		return state, nil

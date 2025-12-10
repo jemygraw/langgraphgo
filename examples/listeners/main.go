@@ -10,7 +10,7 @@ import (
 
 func main() {
 	// Create a graph with listener support
-	g := graph.NewListenableMessageGraph()
+	g := graph.NewListenableStateGraph()
 
 	// Create different types of listeners
 	progressListener := graph.NewProgressListener().
