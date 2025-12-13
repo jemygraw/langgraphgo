@@ -365,6 +365,6 @@ func TestWebFetchInvalidURL(t *testing.T) {
 	// The error could be "failed to create request" or "failed to fetch URL"
 	assert.True(t,
 		strings.Contains(err.Error(), "failed to create request") ||
-		strings.Contains(err.Error(), "failed to fetch URL"),
+			strings.Contains(err.Error(), "failed to fetch URL"),
 		"Expected error message to contain 'failed to create request' or 'failed to fetch URL', got: %v", err)
 }

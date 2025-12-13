@@ -106,7 +106,6 @@ func (t *CalculatorTool) Call(ctx context.Context, input string) (string, error)
 	return "", fmt.Errorf("unsupported operation. Use +, -, *, or /")
 }
 
-
 // MockLLMForReact for testing
 type MockLLMForReact struct {
 	responses     []llms.ContentChoice
@@ -263,9 +262,9 @@ func TestReactAgentState(t *testing.T) {
 func TestCreateReactAgentWithCustomStateTyped(t *testing.T) {
 	// Define custom state type
 	type CustomState struct {
-		Messages []llms.MessageContent `json:"messages"`
-		Step     int                   `json:"step"`
-		Debug    bool                  `json:"debug"`
+		Messages       []llms.MessageContent `json:"messages"`
+		Step           int                   `json:"step"`
+		Debug          bool                  `json:"debug"`
 		IterationCount int
 	}
 
@@ -302,7 +301,6 @@ func TestCreateReactAgentWithCustomStateTyped(t *testing.T) {
 		return s
 	}
 
-
 	hasToolCalls := func(msgs []llms.MessageContent) bool {
 		// For simplicity, always return false
 		return false
@@ -332,11 +330,11 @@ func TestCreateReactAgentWithCustomStateTyped(t *testing.T) {
 func TestCreateReactAgentWithCustomStateTyped_ComplexState(t *testing.T) {
 	// Define complex custom state
 	type ComplexState struct {
-		Messages     []llms.MessageContent `json:"messages"`
-		ToolCalls    []string              `json:"tool_calls"`
-		Thoughts     []string              `json:"thoughts"`
-		Observations []string              `json:"observations"`
-		Complete     bool                  `json:"complete"`
+		Messages       []llms.MessageContent `json:"messages"`
+		ToolCalls      []string              `json:"tool_calls"`
+		Thoughts       []string              `json:"thoughts"`
+		Observations   []string              `json:"observations"`
+		Complete       bool                  `json:"complete"`
 		IterationCount int
 	}
 
@@ -525,7 +523,7 @@ func TestCreateReactAgentTyped_VariousResponses(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name:      "empty response",			responses: []string{""},
+			name: "empty response", responses: []string{""},
 			expectErr: false,
 		},
 		{
@@ -561,7 +559,7 @@ func TestCreateReactAgentWithCustomStateTyped_ComplexScenarios(t *testing.T) {
 				Count int
 			}
 		}
-		Messages []llms.MessageContent
+		Messages       []llms.MessageContent
 		IterationCount int
 	}
 
@@ -615,8 +613,8 @@ func TestCreateReactAgentWithCustomStateTyped_ComplexScenarios(t *testing.T) {
 // Test error handling in CreateReactAgentWithCustomStateTyped
 func TestCreateReactAgentWithCustomStateTyped_ErrorHandling(t *testing.T) {
 	type ErrorState struct {
-		Messages []llms.MessageContent
-		Error    error
+		Messages       []llms.MessageContent
+		Error          error
 		IterationCount int
 	}
 
@@ -1027,7 +1025,6 @@ func TestCreateReactAgentTyped_ComplexToolNames(t *testing.T) {
 		t.Fatal("Agent should not be nil")
 	}
 }
-
 
 // Test CreateReactAgentTyped error scenarios
 func TestCreateReactAgentTyped_ErrorScenarios(t *testing.T) {

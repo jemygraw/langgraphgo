@@ -11,8 +11,8 @@ import (
 
 // CounterState represents the state for our counter example
 type CounterState struct {
-	Count int    `json:"count"`
-	Name  string `json:"name"`
+	Count int      `json:"count"`
+	Name  string   `json:"name"`
 	Logs  []string `json:"logs"`
 }
 

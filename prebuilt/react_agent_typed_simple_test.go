@@ -49,7 +49,7 @@ func TestReactAgentState_Simple(t *testing.T) {
 	assert.Equal(t, 1, len(state.Messages))
 }
 
-	// TestCreateReactAgentWithCustomStateTyped_Simple Tests custom state creation
+// TestCreateReactAgentWithCustomStateTyped_Simple Tests custom state creation
 func TestCreateReactAgentWithCustomStateTyped_Simple(t *testing.T) {
 	type TestState struct {
 		Data           string

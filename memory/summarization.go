@@ -24,8 +24,8 @@ type SummarizationMemory struct {
 
 // SummarizationConfig holds configuration for summarization memory
 type SummarizationConfig struct {
-	RecentWindowSize int                                                       // Number of recent messages to keep
-	SummarizeAfter   int                                                       // Trigger summarization after this many messages
+	RecentWindowSize int                                                            // Number of recent messages to keep
+	SummarizeAfter   int                                                            // Trigger summarization after this many messages
 	Summarizer       func(ctx context.Context, messages []*Message) (string, error) // Custom summarizer
 }
 

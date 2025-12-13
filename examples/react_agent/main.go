@@ -88,7 +88,7 @@ func main() {
 	}
 
 	// Create ReAct Agent
-	agent, err := prebuilt.CreateReactAgent(model, inputTools)
+	agent, err := prebuilt.CreateReactAgent(model, inputTools, 20)
 	if err != nil {
 		log.Fatal(err)
 	}

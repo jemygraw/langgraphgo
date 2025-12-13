@@ -273,7 +273,7 @@ func TestPlannerNode(t *testing.T) {
 						Parts: []llms.ContentPart{llms.TextPart("Calculate 2+2")},
 					},
 				},
-				"retries": 1,
+				"retries":          1,
 				"last_tool_result": "Error: calculation failed",
 				"verification_result": VerificationResult{
 					IsSuccessful: false,
@@ -429,11 +429,11 @@ func TestExecutorNode(t *testing.T) {
 
 func TestVerifierNode(t *testing.T) {
 	tests := []struct {
-		name             string
-		state            map[string]any
+		name               string
+		state              map[string]any
 		verificationPrompt string
-		verbose          bool
-		expectError      bool
+		verbose            bool
+		expectError        bool
 	}{
 		{
 			name: "successful verification",
@@ -517,9 +517,9 @@ func TestVerifierNode(t *testing.T) {
 
 func TestSynthesizerNode(t *testing.T) {
 	tests := []struct {
-		name       string
-		state      map[string]any
-		verbose    bool
+		name        string
+		state       map[string]any
+		verbose     bool
 		expectError bool
 	}{
 		{
@@ -536,7 +536,7 @@ func TestSynthesizerNode(t *testing.T) {
 					"Step 2: Verify result -> Correct",
 				},
 			},
-			verbose:    false,
+			verbose:     false,
 			expectError: false,
 		},
 		{
@@ -549,7 +549,7 @@ func TestSynthesizerNode(t *testing.T) {
 				},
 				"intermediate_steps": []string{},
 			},
-			verbose:    false,
+			verbose:     false,
 			expectError: false,
 		},
 		{
@@ -561,7 +561,7 @@ func TestSynthesizerNode(t *testing.T) {
 						Parts: []llms.ContentPart{llms.TextPart("Task")}},
 				},
 			},
-			verbose:    true,
+			verbose:     true,
 			expectError: false,
 		},
 	}
@@ -654,13 +654,13 @@ func TestRouteAfterExecutor(t *testing.T) {
 			name: "always go to verifier",
 			state: map[string]any{
 				"current_step": 0,
-				"plan": []string{"Step 1"},
+				"plan":         []string{"Step 1"},
 			},
 			expectedRoute: "verifier",
 		},
 		{
-			name: "empty state still goes to verifier",
-			state: map[string]any{},
+			name:          "empty state still goes to verifier",
+			state:         map[string]any{},
 			expectedRoute: "verifier",
 		},
 	}
@@ -690,8 +690,8 @@ func TestRouteAfterVerifier(t *testing.T) {
 					IsSuccessful: true,
 				},
 				"current_step": 0,
-				"plan": []string{"Step 1", "Step 2"},
-				"retries": 0,
+				"plan":         []string{"Step 1", "Step 2"},
+				"retries":      0,
 			},
 			maxRetries:    3,
 			verbose:       false,
@@ -704,8 +704,8 @@ func TestRouteAfterVerifier(t *testing.T) {
 					IsSuccessful: true,
 				},
 				"current_step": 1,
-				"plan": []string{"Step 1", "Step 2"},
-				"retries": 0,
+				"plan":         []string{"Step 1", "Step 2"},
+				"retries":      0,
 			},
 			maxRetries:    3,
 			verbose:       false,
@@ -718,8 +718,8 @@ func TestRouteAfterVerifier(t *testing.T) {
 					IsSuccessful: false,
 				},
 				"current_step": 0,
-				"plan": []string{"Step 1"},
-				"retries": 1,
+				"plan":         []string{"Step 1"},
+				"retries":      1,
 			},
 			maxRetries:    3,
 			verbose:       false,
@@ -732,8 +732,8 @@ func TestRouteAfterVerifier(t *testing.T) {
 					IsSuccessful: false,
 				},
 				"current_step": 0,
-				"plan": []string{"Step 1"},
-				"retries": 3,
+				"plan":         []string{"Step 1"},
+				"retries":      3,
 			},
 			maxRetries:    3,
 			verbose:       true,
@@ -759,10 +759,10 @@ func TestRouteAfterVerifier(t *testing.T) {
 
 func TestExecuteStep(t *testing.T) {
 	tests := []struct {
-		name          string
-		stepDesc      string
-		toolExecutor  *ToolExecutor
-		expectError   bool
+		name           string
+		stepDesc       string
+		toolExecutor   *ToolExecutor
+		expectError    bool
 		expectContains string
 	}{
 		{
@@ -771,14 +771,14 @@ func TestExecuteStep(t *testing.T) {
 			toolExecutor: &ToolExecutor{
 				tools: map[string]tools.Tool{},
 			},
-			expectError:   false,
+			expectError:    false,
 			expectContains: "No tools available",
 		},
 		{
-			name:     "nil tool executor",
-			stepDesc: "Do something",
-			toolExecutor: nil,
-			expectError:   false,
+			name:           "nil tool executor",
+			stepDesc:       "Do something",
+			toolExecutor:   nil,
+			expectError:    false,
 			expectContains: "No tools available",
 		},
 		{
@@ -791,7 +791,7 @@ func TestExecuteStep(t *testing.T) {
 					response:    "4",
 				},
 			}),
-			expectError:   false,
+			expectError:    false,
 			expectContains: "4",
 		},
 	}

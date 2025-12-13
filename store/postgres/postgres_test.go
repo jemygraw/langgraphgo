@@ -704,4 +704,3 @@ func TestNewPostgresCheckpointStore_InvalidConnection(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to create connection pool")
 }
-

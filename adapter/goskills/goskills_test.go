@@ -222,7 +222,7 @@ func TestSkillTool_Call_CustomScript(t *testing.T) {
 	require.NoError(t, err)
 
 	tool := &SkillTool{
-		name:      "custom_script",
+		name: "custom_script",
 		scriptMap: map[string]string{
 			"custom_script": scriptPath,
 		},

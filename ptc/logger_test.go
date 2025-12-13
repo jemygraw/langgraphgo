@@ -67,9 +67,9 @@ print(result)
 // TestLogLevels tests different log levels
 func TestLogLevels(t *testing.T) {
 	tests := []struct {
-		name          string
-		level         log.LogLevel
-		shouldContain []string
+		name             string
+		level            log.LogLevel
+		shouldContain    []string
 		shouldNotContain []string
 	}{
 		{
@@ -78,15 +78,15 @@ func TestLogLevels(t *testing.T) {
 			shouldContain: []string{"[DEBUG]", "[INFO]", "[WARN]", "[ERROR]"},
 		},
 		{
-			name:          "Info level",
-			level:         log.LogLevelInfo,
-			shouldContain: []string{"[INFO]", "[WARN]", "[ERROR]"},
+			name:             "Info level",
+			level:            log.LogLevelInfo,
+			shouldContain:    []string{"[INFO]", "[WARN]", "[ERROR]"},
 			shouldNotContain: []string{"[DEBUG]"},
 		},
 		{
-			name:          "Error level",
-			level:         log.LogLevelError,
-			shouldContain: []string{"[ERROR]"},
+			name:             "Error level",
+			level:            log.LogLevelError,
+			shouldContain:    []string{"[ERROR]"},
 			shouldNotContain: []string{"[DEBUG]", "[INFO]", "[WARN]"},
 		},
 	}

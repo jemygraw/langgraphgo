@@ -129,8 +129,8 @@ func demoBufferMemory(ctx context.Context) {
 
 func demoSummarizationMemory(ctx context.Context) {
 	mem := memory.NewSummarizationMemory(&memory.SummarizationConfig{
-		RecentWindowSize: 2,  // Keep last 2 messages
-		SummarizeAfter:   4,  // Summarize after 4 messages
+		RecentWindowSize: 2, // Keep last 2 messages
+		SummarizeAfter:   4, // Summarize after 4 messages
 	})
 
 	// Add messages to trigger summarization
@@ -287,8 +287,8 @@ func demoCompressionMemory(ctx context.Context) {
 
 func demoOSLikeMemory(ctx context.Context) {
 	mem := memory.NewOSLikeMemory(&memory.OSLikeConfig{
-		ActiveLimit:  2,              // 2 pages in active memory
-		CacheLimit:   3,              // 3 pages in cache
+		ActiveLimit:  2, // 2 pages in active memory
+		CacheLimit:   3, // 3 pages in cache
 		AccessWindow: time.Minute * 5,
 	})
 

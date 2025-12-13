@@ -14,7 +14,7 @@ import (
 // SupervisorTypedMockLLM for testing supervisor typed
 type SupervisorTypedMockLLM struct {
 	responses   []llms.ContentResponse
-	currentIdx int
+	currentIdx  int
 	returnError error
 }
 
@@ -417,7 +417,7 @@ func TestCreateSupervisorTyped_InvalidRouteArguments(t *testing.T) {
 func TestCreateSupervisorTyped_LLMError(t *testing.T) {
 	// Test when LLM returns an error
 	mockLLM := &SupervisorTypedMockLLM{
-		responses: []llms.ContentResponse{},
+		responses:   []llms.ContentResponse{},
 		returnError: errors.New("LLM connection failed"),
 	}
 
@@ -852,7 +852,7 @@ func TestCreateSupervisorWithStateTyped_ErrorHandling(t *testing.T) {
 
 	// Test with LLM error
 	mockLLM := &SupervisorTypedMockLLM{
-		responses: []llms.ContentResponse{},
+		responses:   []llms.ContentResponse{},
 		returnError: errors.New("LLM error in custom state"),
 	}
 
@@ -1088,7 +1088,7 @@ func TestCreateSupervisorWithStateTyped_EmptyMembers(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "FINISH", res.Next)
 	assert.True(t, len(res.Messages) >= 1) // Initial message plus possible supervisor routing
-	assert.Equal(t, "initial", res.Data) // Data should be preserved
+	assert.Equal(t, "initial", res.Data)   // Data should be preserved
 }
 
 // Test SupervisorState structure

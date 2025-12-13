@@ -10,10 +10,10 @@ import (
 
 // ExecutionAgent is responsible for gathering information for research questions
 type ExecutionAgent struct {
-	Model      llms.Model
-	Config     *Config
-	Tools      *ToolRegistry
-	Verbose    bool
+	Model   llms.Model
+	Config  *Config
+	Tools   *ToolRegistry
+	Verbose bool
 }
 
 // NewExecutionAgent creates a new execution agent

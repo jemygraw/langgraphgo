@@ -166,14 +166,14 @@ func TestAgentNodeMaxIterations(t *testing.T) {
 func TestCreatePTCAgent(t *testing.T) {
 	mockLLM := &MockLLM{response: "This is a response."}
 	tool := &MockTool{name: "test_tool"}
-	
+
 	// Create a mock server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"result": "mock server response"}`))
 	}))
 	defer server.Close()
-	
+
 	config := PTCAgentConfig{
 		Model:         mockLLM,
 		Tools:         []tools.Tool{tool},
@@ -183,7 +183,7 @@ func TestCreatePTCAgent(t *testing.T) {
 
 	// The executor in CreatePTCAgent starts a server, which we can't easily do in a test.
 	// So we can't fully test CreatePTCAgent here, but we can check the config validation.
-	
+
 	// Test without model
 	config.Model = nil
 	_, err := CreatePTCAgent(config)

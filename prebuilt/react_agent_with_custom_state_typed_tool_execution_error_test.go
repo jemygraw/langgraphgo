@@ -16,7 +16,7 @@ func TestCreateReactAgentWithCustomStateTyped_ToolExecutionError(t *testing.T) {
 		IterationCount int
 	}
 
-	tool := &MockToolError{name: "error_tool"} // Use the mock tool that returns an error
+	tool := &MockToolError{name: "error_tool"}          // Use the mock tool that returns an error
 	mockLLM := NewMockLLMWithToolCalls([]llms.ToolCall{ // LLM returns a tool call
 		{
 			ID: "call_1",

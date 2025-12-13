@@ -9,11 +9,11 @@ import (
 // Similar to LangChain's ConversationBufferMemory
 // Combines sliding window with optional summarization
 type BufferMemory struct {
-	messages     []*Message
-	maxMessages  int  // 0 = unlimited
-	maxTokens    int  // 0 = unlimited
+	messages      []*Message
+	maxMessages   int  // 0 = unlimited
+	maxTokens     int  // 0 = unlimited
 	autoSummarize bool // Auto-summarize when limits exceeded
-	mu           sync.RWMutex
+	mu            sync.RWMutex
 
 	// Optional summarizer
 	Summarizer func(ctx context.Context, messages []*Message) (string, error)

@@ -12,7 +12,7 @@ import (
 
 // MockLLM for testing
 type MockLLM struct {
-	response string
+	response  string
 	callCount int
 }
 

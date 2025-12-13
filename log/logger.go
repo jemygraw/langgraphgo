@@ -40,7 +40,7 @@ type DefaultLogger struct {
 // NewDefaultLogger creates a new default logger
 func NewDefaultLogger(level LogLevel) *DefaultLogger {
 	return &DefaultLogger{
-		logger: log.New(os.Stderr, "[PTC] ", log.LstdFlags),
+		logger: log.New(os.Stderr, "[lango] ", log.LstdFlags),
 		level:  level,
 	}
 }
@@ -48,7 +48,7 @@ func NewDefaultLogger(level LogLevel) *DefaultLogger {
 // NewCustomLogger creates a logger with custom output
 func NewCustomLogger(out io.Writer, level LogLevel) *DefaultLogger {
 	return &DefaultLogger{
-		logger: log.New(out, "[PTC] ", log.LstdFlags),
+		logger: log.New(out, "[lango] ", log.LstdFlags),
 		level:  level,
 	}
 }

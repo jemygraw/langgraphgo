@@ -44,7 +44,7 @@ func main() {
 
 	// 3. Create the ReAct Agent
 	// The agent will use the LLM to decide when to call the tool
-	agent, err := prebuilt.CreateReactAgent(llm, []tools.Tool{braveTool})
+	agent, err := prebuilt.CreateReactAgent(llm, []tools.Tool{braveTool}, 20)
 	if err != nil {
 		log.Fatalf("Failed to create agent: %v", err)
 	}

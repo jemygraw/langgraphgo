@@ -119,7 +119,7 @@ func (ln *ListenableNodeTyped[S]) RemoveListenerByFunc(listener NodeListenerType
 	for i, lw := range ln.listeners {
 		// Compare pointer values for reference equality
 		if &lw.listener == &listener ||
-		   fmt.Sprintf("%p", lw.listener) == fmt.Sprintf("%p", listener) {
+			fmt.Sprintf("%p", lw.listener) == fmt.Sprintf("%p", listener) {
 			ln.listeners = append(ln.listeners[:i], ln.listeners[i+1:]...)
 			break
 		}

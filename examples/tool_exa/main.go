@@ -37,7 +37,7 @@ func main() {
 	}
 
 	// 3. Create the ReAct Agent
-	agent, err := prebuilt.CreateReactAgent(llm, []tools.Tool{exaTool})
+	agent, err := prebuilt.CreateReactAgent(llm, []tools.Tool{exaTool}, 20)
 	if err != nil {
 		log.Fatalf("Failed to create agent: %v", err)
 	}

@@ -29,7 +29,7 @@ type GraphBasedMemory struct {
 
 // GraphConfig holds configuration for graph-based memory
 type GraphConfig struct {
-	TopK              int                          // Number of messages to retrieve
+	TopK              int                         // Number of messages to retrieve
 	RelationExtractor func(msg *Message) []string // Custom relation extractor
 }
 

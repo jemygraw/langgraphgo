@@ -57,18 +57,18 @@ func (t *WeatherTool) Call(ctx context.Context, input string) (string, error) {
 
 	// Simulate weather data based on location
 	weatherData := map[string]string{
-		"beijing":    fmt.Sprintf("北京天气: %d°C, 晴天", t.currentTemp),
-		"shanghai":   fmt.Sprintf("上海天气: %d°C, 多云", t.currentTemp-2),
-		"guangzhou":  fmt.Sprintf("广州天气: %d°C, 阴天", t.currentTemp+5),
-		"shenzhen":   fmt.Sprintf("深圳天气: %d°C, 小雨", t.currentTemp+3),
-		"hangzhou":   fmt.Sprintf("杭州天气: %d°C, 晴天", t.currentTemp-1),
-		"chengdu":    fmt.Sprintf("成都天气: %d°C, 雾霾", t.currentTemp-3),
-		"wuhan":      fmt.Sprintf("武汉天气: %d°C, 晴天", t.currentTemp),
-		"xian":       fmt.Sprintf("西安天气: %d°C, 多云", t.currentTemp-4),
-		"new york":   fmt.Sprintf("New York weather: %d°F, sunny", t.currentTemp*2+32),
-		"london":     fmt.Sprintf("London weather: %d°C, cloudy", t.currentTemp-10),
-		"tokyo":      fmt.Sprintf("Tokyo weather: %d°C, rainy", t.currentTemp-5),
-		"paris":      fmt.Sprintf("Paris weather: %d°C, partly cloudy", t.currentTemp-8),
+		"beijing":   fmt.Sprintf("北京天气: %d°C, 晴天", t.currentTemp),
+		"shanghai":  fmt.Sprintf("上海天气: %d°C, 多云", t.currentTemp-2),
+		"guangzhou": fmt.Sprintf("广州天气: %d°C, 阴天", t.currentTemp+5),
+		"shenzhen":  fmt.Sprintf("深圳天气: %d°C, 小雨", t.currentTemp+3),
+		"hangzhou":  fmt.Sprintf("杭州天气: %d°C, 晴天", t.currentTemp-1),
+		"chengdu":   fmt.Sprintf("成都天气: %d°C, 雾霾", t.currentTemp-3),
+		"wuhan":     fmt.Sprintf("武汉天气: %d°C, 晴天", t.currentTemp),
+		"xian":      fmt.Sprintf("西安天气: %d°C, 多云", t.currentTemp-4),
+		"new york":  fmt.Sprintf("New York weather: %d°F, sunny", t.currentTemp*2+32),
+		"london":    fmt.Sprintf("London weather: %d°C, cloudy", t.currentTemp-10),
+		"tokyo":     fmt.Sprintf("Tokyo weather: %d°C, rainy", t.currentTemp-5),
+		"paris":     fmt.Sprintf("Paris weather: %d°C, partly cloudy", t.currentTemp-8),
 	}
 
 	if weather, ok := weatherData[input]; ok {

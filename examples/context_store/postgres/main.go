@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/smallnest/langgraphgo/checkpoint/redis"
 	"github.com/smallnest/langgraphgo/graph"
+	"github.com/smallnest/langgraphgo/store/postgres"
 )
 
 type ProcessState struct {
@@ -18,22 +18,32 @@ type ProcessState struct {
 }
 
 func main() {
-	// Check for Redis address
-	redisAddr := os.Getenv("REDIS_ADDR")
-	if redisAddr == "" {
-		redisAddr = "localhost:6379"
+	// Check for Postgres connection string
+	connString := os.Getenv("POSTGRES_CONN_STRING")
+	if connString == "" {
+		fmt.Println("POSTGRES_CONN_STRING environment variable not set. Skipping execution.")
+		fmt.Println("To run this example, set POSTGRES_CONN_STRING to a valid PostgreSQL connection string.")
+		fmt.Println("Example: export POSTGRES_CONN_STRING=postgres://user:password@localhost:5432/dbname")
+		return
 	}
-	fmt.Printf("Using Redis at: %s\n", redisAddr)
 
 	// Create a checkpointable graph
 	g := graph.NewCheckpointableStateGraph()
 
-	// Initialize Redis Checkpoint Store
-	store := redis.NewRedisCheckpointStore(redis.RedisOptions{
-		Addr:   redisAddr,
-		Prefix: "example_checkpoints:",
-		TTL:    1 * time.Hour,
+	// Initialize Postgres Checkpoint Store
+	store, err := postgres.NewPostgresCheckpointStore(context.Background(), postgres.PostgresOptions{
+		ConnString: connString,
+		TableName:  "example_checkpoints",
 	})
+	if err != nil {
+		panic(fmt.Errorf("failed to create postgres store: %w", err))
+	}
+	defer store.Close()
+
+	// Initialize Schema
+	if err := store.InitSchema(context.Background()); err != nil {
+		panic(fmt.Errorf("failed to init schema: %w", err))
+	}
 
 	// Configure checkpointing
 	config := graph.CheckpointConfig{
@@ -94,15 +104,12 @@ func main() {
 		History: []string{"Initialized"},
 	}
 
-	fmt.Println("=== Starting execution with Redis checkpointing ===")
+	fmt.Println("=== Starting execution with Postgres checkpointing ===")
 
 	// Execute with automatic checkpointing
 	result, err := runnable.Invoke(ctx, initialState)
 	if err != nil {
-		// If redis is not available, it might fail.
-		// For example purposes, we just panic.
-		fmt.Printf("Execution failed (is Redis running?): %v\n", err)
-		return
+		panic(err)
 	}
 
 	finalState := result.(ProcessState)
@@ -117,7 +124,7 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Printf("\n=== Created %d checkpoints in Redis ===\n", len(checkpoints))
+	fmt.Printf("\n=== Created %d checkpoints in Postgres ===\n", len(checkpoints))
 	for i, cp := range checkpoints {
 		fmt.Printf("Checkpoint %d: ID=%s, Time=%v\n", i+1, cp.ID, cp.Timestamp)
 	}

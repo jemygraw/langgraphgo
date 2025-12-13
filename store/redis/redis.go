@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/smallnest/langgraphgo/graph"
 	"github.com/redis/go-redis/v9"
+	"github.com/smallnest/langgraphgo/graph"
 )
 
 // RedisCheckpointStore implements graph.CheckpointStore using Redis

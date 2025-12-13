@@ -69,13 +69,13 @@ func main() {
 	}
 
 	// 1. Create Math Agent
-	mathAgent, err := prebuilt.CreateReactAgent(model, []tools.Tool{CalculatorTool{}})
+	mathAgent, err := prebuilt.CreateReactAgent(model, []tools.Tool{CalculatorTool{}}, 20)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// 2. Create General Agent (just a simple runnable or react agent with no tools)
-	generalAgent, err := prebuilt.CreateReactAgent(model, []tools.Tool{})
+	generalAgent, err := prebuilt.CreateReactAgent(model, []tools.Tool{}, 20)
 	if err != nil {
 		log.Fatal(err)
 	}

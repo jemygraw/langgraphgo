@@ -14,7 +14,7 @@ import (
 // SupervisorMockLLM for supervisor testing
 type SupervisorMockLLM struct {
 	responses   []llms.ContentResponse
-	currentIdx int
+	currentIdx  int
 	returnError error
 }
 
@@ -347,7 +347,7 @@ func TestCreateSupervisor_MissingMessages(t *testing.T) {
 func TestCreateSupervisor_LLMError(t *testing.T) {
 	// Test when LLM returns an error
 	mockLLM := &SupervisorMockLLM{
-		responses: []llms.ContentResponse{},
+		responses:   []llms.ContentResponse{},
 		returnError: errors.New("LLM connection failed"),
 	}
 

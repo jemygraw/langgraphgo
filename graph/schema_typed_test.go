@@ -66,8 +66,8 @@ func TestStructSchema_Update(t *testing.T) {
 			},
 			merge: nil, // Use default merge
 			expected: TestSchemaState{
-				Name:  "new",      // Overwritten
-				Count: 2,         // Overwritten
+				Name:  "new",         // Overwritten
+				Count: 2,             // Overwritten
 				Items: []string{"a"}, // Preserved
 			},
 		},
@@ -98,16 +98,16 @@ func TestStructSchema_Update(t *testing.T) {
 				Items: []string{"x"},
 			},
 			new: TestSchemaState{
-				Name:  "",        // Zero value
-				Count: 0,         // Zero value
-				Items: nil,       // Zero value
+				Name:  "",  // Zero value
+				Count: 0,   // Zero value
+				Items: nil, // Zero value
 				Data:  map[string]interface{}{"key": "value"},
 			},
 			merge: nil,
 			expected: TestSchemaState{
-				Name:  "initial", // Preserved
-				Count: 5,         // Preserved
-				Items: []string{"x"}, // Preserved
+				Name:  "initial",                              // Preserved
+				Count: 5,                                      // Preserved
+				Items: []string{"x"},                          // Preserved
 				Data:  map[string]interface{}{"key": "value"}, // Overwritten
 			},
 		},
@@ -158,9 +158,9 @@ func TestDefaultStructMerge(t *testing.T) {
 				Data:  map[string]interface{}{"new": "value"},
 			},
 			expected: TestSchemaState{
-				Name:  "new",                    // Overwritten
-				Count: 2,                       // Overwritten
-				Items: []string{"a", "b"},       // Preserved (zero in new)
+				Name:  "new",                                  // Overwritten
+				Count: 2,                                      // Overwritten
+				Items: []string{"a", "b"},                     // Preserved (zero in new)
 				Data:  map[string]interface{}{"new": "value"}, // Overwritten
 			},
 		},

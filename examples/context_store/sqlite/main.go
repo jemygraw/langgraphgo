@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/smallnest/langgraphgo/checkpoint/sqlite"
 	"github.com/smallnest/langgraphgo/graph"
+	"github.com/smallnest/langgraphgo/store/sqlite"
 )
 
 type ProcessState struct {

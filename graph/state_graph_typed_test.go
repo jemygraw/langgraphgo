@@ -629,7 +629,7 @@ func TestInvokeWithConfig_WithTags(t *testing.T) {
 
 	ctx := context.Background()
 	config := &Config{
-		Tags: []string{"test", "parallel"},
+		Tags:         []string{"test", "parallel"},
 		Configurable: map[string]any{"limit": 10},
 	}
 

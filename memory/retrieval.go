@@ -24,7 +24,7 @@ type RetrievalMemory struct {
 
 // RetrievalConfig holds configuration for retrieval-based memory
 type RetrievalConfig struct {
-	TopK          int                                                        // Number of messages to retrieve
+	TopK          int                                                       // Number of messages to retrieve
 	EmbeddingFunc func(ctx context.Context, text string) ([]float64, error) // Custom embedding function
 }
 
