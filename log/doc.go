@@ -96,6 +96,36 @@
 // multiple goroutines. The underlying log.Logger from Go's standard library handles
 // synchronization internally.
 //
+// # Available Implementations
+//
+// ## Standard Library Logger
+//
+// The package provides a DefaultLogger implementation using Go's standard log package.
+//
+// ## golog Integration
+//
+// For users who prefer the `github.com/kataras/golog` library, we provide a minimal wrapper:
+//
+//	import "github.com/kataras/golog"
+//
+//	// Create a golog logger
+//	glogger := golog.New()
+//	glogger.SetPrefix("[MyApp] ")
+//
+//	// Wrap it with LangGraph's Logger interface
+//	logger := log.NewGologLogger(glogger)
+//
+//	// Use like any other LangGraph logger
+//	logger.Info("Application started")
+//	logger.SetLevel(log.LogLevelDebug)
+//	logger.Debug("Debug information")
+//
+// Key points:
+//   - `NewGologLogger()` requires an existing golog.Logger instance
+//   - Implements the same Logger interface as other loggers
+//   - Respects LangGraph log levels while using golog's formatting
+//   - Minimal wrapper - just forwards calls to the underlying golog logger
+//
 // # Custom Loggers
 //
 // You can implement the Logger interface for custom logging solutions:
