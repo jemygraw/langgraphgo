@@ -364,9 +364,65 @@ func (lr *ListenableRunnableTyped[S]) WithTracer(tracer *Tracer) *ListenableRunn
 
 // GetGraph returns an Exporter for visualization
 func (lr *ListenableRunnableTyped[S]) GetGraph() *Exporter {
-	// For now, return nil as typed graphs cannot be directly exported
-	// TODO: Implement typed graph visualization
-	return nil
+	// Convert the typed graph to a regular graph for visualization
+	regularGraph := lr.convertToRegularGraph()
+	return NewExporter(regularGraph)
+}
+
+// convertToRegularGraph converts a StateGraphTyped[S] to StateGraph for visualization
+func (lr *ListenableRunnableTyped[S]) convertToRegularGraph() *StateGraph {
+	regularGraph := NewStateGraph()
+	typedGraph := lr.graph.StateGraphTyped
+
+	// Copy nodes
+	for name, typedNode := range typedGraph.nodes {
+		// Convert the typed node function to a regular function that accepts any
+		regularFunc := func(ctx context.Context, state any) (any, error) {
+			typedState, ok := state.(S)
+			if !ok {
+				// If state type doesn't match, create a zero value of S
+				var zero S
+				typedState = zero
+			}
+			return typedNode.Function(ctx, typedState)
+		}
+
+		regularGraph.AddNode(name, typedNode.Description, regularFunc)
+	}
+
+	// Copy edges
+	for _, edge := range typedGraph.edges {
+		regularGraph.AddEdge(edge.From, edge.To)
+	}
+
+	// Copy conditional edges
+	for from, condition := range typedGraph.conditionalEdges {
+		regularCondition := func(ctx context.Context, state any) string {
+			typedState, ok := state.(S)
+			if !ok {
+				// If state type doesn't match, create a zero value of S
+				var zero S
+				typedState = zero
+			}
+			return condition(ctx, typedState)
+		}
+		regularGraph.AddConditionalEdge(from, regularCondition)
+	}
+
+	// Set entry point
+	if typedGraph.entryPoint != "" {
+		regularGraph.SetEntryPoint(typedGraph.entryPoint)
+	}
+
+	// Copy retry policy
+	if typedGraph.retryPolicy != nil {
+		regularGraph.retryPolicy = typedGraph.retryPolicy
+	}
+
+	// Note: Schema and stateMerger are not copied as they are type-specific
+	// and primarily for execution, not visualization
+
+	return regularGraph
 }
 
 // StreamingListenerTyped is a listener that streams node events

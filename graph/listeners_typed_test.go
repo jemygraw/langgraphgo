@@ -3,6 +3,7 @@ package graph
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -776,20 +777,75 @@ done:
 
 func TestListenableRunnableTyped_GetGraph(t *testing.T) {
 	g := NewListenableStateGraphTyped[TestListenerState]()
-	g.AddNode("test", "Test", func(ctx context.Context, state TestListenerState) (TestListenerState, error) {
+	g.AddNode("start", "Start node", func(ctx context.Context, state TestListenerState) (TestListenerState, error) {
+		state.Count = 1
+		state.Step = "started"
 		return state, nil
 	})
-	g.SetEntryPoint("test")
-	g.AddEdge("test", END)
+
+	g.AddNode("process", "Process node", func(ctx context.Context, state TestListenerState) (TestListenerState, error) {
+		state.Count++
+		state.Step = "processed"
+		return state, nil
+	})
+
+	g.AddNode("end", "End node", func(ctx context.Context, state TestListenerState) (TestListenerState, error) {
+		state.Count++
+		state.Step = "ended"
+		return state, nil
+	})
+
+	g.SetEntryPoint("start")
+	g.AddEdge("start", "process")
+	g.AddEdge("process", "end")
+	g.AddEdge("end", END)
+
+	// Add a conditional edge
+	g.AddConditionalEdge("end", func(ctx context.Context, state TestListenerState) string {
+		if state.Count > 2 {
+			return END
+		}
+		return "process"
+	})
 
 	runnable, err := g.CompileListenable()
 	if err != nil {
 		t.Fatalf("Failed to compile: %v", err)
 	}
 
-	// GetGraph should return nil for typed graphs (as noted in the comment)
-	graph := runnable.GetGraph()
-	if graph != nil {
-		t.Error("GetGraph should return nil for typed graphs")
+	// GetGraph should now return a valid Exporter for typed graphs
+	exporter := runnable.GetGraph()
+	if exporter == nil {
+		t.Fatal("GetGraph returned nil")
+	}
+
+	// Test that the exporter can generate diagrams
+	mermaid := exporter.DrawMermaid()
+	if mermaid == "" {
+		t.Error("DrawMermaid returned empty string")
+	}
+
+	dot := exporter.DrawDOT()
+	if dot == "" {
+		t.Error("DrawDOT returned empty string")
+	}
+
+	ascii := exporter.DrawASCII()
+	if ascii == "" {
+		t.Error("DrawASCII returned empty string")
+	}
+
+	// Verify the diagrams contain expected elements
+	if !strings.Contains(mermaid, "start") {
+		t.Error("Mermaid diagram should contain 'start' node")
+	}
+	if !strings.Contains(mermaid, "process") {
+		t.Error("Mermaid diagram should contain 'process' node")
+	}
+	if !strings.Contains(mermaid, "end") {
+		t.Error("Mermaid diagram should contain 'end' node")
+	}
+	if !strings.Contains(mermaid, "START") {
+		t.Error("Mermaid diagram should contain 'START' node")
 	}
 }
