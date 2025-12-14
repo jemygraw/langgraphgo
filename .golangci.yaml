@@ -50,7 +50,7 @@ linters:
     # Error handling style (not bugs)
     - errorlint
     - wrapcheck
-    - goerr113
+    - err113
     
     # Import organization (not critical)
     - depguard
@@ -62,7 +62,6 @@ linters:
     
     # Code organization (not bugs)
     - exhaustruct
-    - gomnd
     - mnd
 
 linters-settings:
