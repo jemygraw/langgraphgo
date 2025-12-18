@@ -26,10 +26,12 @@ import (
 
 // Config holds application configuration
 type Config struct {
-	ChatTitle     string
-	OpenAIAPIKey  string
-	OpenAIModel   string
-	OpenAIBaseURL string
+	ChatTitle      string
+	AppLogo        string
+	OpenAIAPIKey   string
+	OpenAIModel    string
+	OpenAIBaseURL  string
+	EnableFeedback bool
 }
 
 // getEnvOrDefault returns environment variable or default value
@@ -43,10 +45,12 @@ func getEnvOrDefault(key, defaultValue string) string {
 // getConfig returns application configuration
 func GetConfig() Config {
 	return Config{
-		ChatTitle:     getEnvOrDefault("CHAT_TITLE", "LangGraphGo 聊天"),
-		OpenAIAPIKey:  os.Getenv("OPENAI_API_KEY"),
-		OpenAIModel:   getEnvOrDefault("OPENAI_MODEL", "gpt-4o-mini"),
-		OpenAIBaseURL: os.Getenv("OPENAI_BASE_URL"),
+		ChatTitle:      getEnvOrDefault("CHAT_TITLE", "LangGraphGo 聊天"),
+		AppLogo:        getEnvOrDefault("APP_LOGO", "https://github.com/smallnest/lango-website/blob/master/images/logo/lango5.png?raw=true"),
+		OpenAIAPIKey:   os.Getenv("OPENAI_API_KEY"),
+		OpenAIModel:    getEnvOrDefault("OPENAI_MODEL", "gpt-4o-mini"),
+		OpenAIBaseURL:  os.Getenv("OPENAI_BASE_URL"),
+		EnableFeedback: getEnvOrDefault("ENABLE_FEEDBACK", "true") == "true",
 	}
 }
 
@@ -820,7 +824,7 @@ func (cs *ChatServer) HandleChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Add user message to history
-	sm.AddMessage(req.SessionID, "user", req.Message)
+	_, _ = sm.AddMessage(req.SessionID, "user", req.Message)
 
 	// Use user settings directly
 	enableSkills := req.UserSettings.EnableSkills
@@ -855,12 +859,13 @@ func (cs *ChatServer) HandleChatNonStream(w http.ResponseWriter, r *http.Request
 	// Add assistant response to history
 	clientID := getClientID(r)
 	sm := cs.GetSessionManager(clientID)
-	sm.AddMessage(sessionID, "assistant", response)
+	msgID, _ := sm.AddMessage(sessionID, "assistant", response)
 
 	// Send response
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
-		"response": response,
+		"response":   response,
+		"message_id": msgID,
 	})
 }
 
@@ -943,12 +948,13 @@ func (cs *ChatServer) HandleChatStream(w http.ResponseWriter, r *http.Request, a
 	}
 
 	// Save the complete response to history
-	sm.AddMessage(sessionID, "assistant", response)
+	msgID, _ := sm.AddMessage(sessionID, "assistant", response)
 
 	// Send end event
 	endData := map[string]any{
-		"type":    "end",
-		"message": response,
+		"type":       "end",
+		"message":    response,
+		"message_id": msgID,
 	}
 	jsonEndData, _ := json.Marshal(endData)
 	fmt.Fprintf(w, "event: end\ndata: %s\n\n", jsonEndData)
@@ -1122,11 +1128,44 @@ func (cs *ChatServer) HandleToolsHierarchical(w http.ResponseWriter, r *http.Req
 	json.NewEncoder(w).Encode(result)
 }
 
+// HandleFeedback handles message feedback (like/dislike)
+func (cs *ChatServer) HandleFeedback(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		SessionID string `json:"session_id"`
+		MessageID string `json:"message_id"`
+		Feedback  string `json:"feedback"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	clientID := getClientID(r)
+	sm := cs.GetSessionManager(clientID)
+
+	err := sm.UpdateMessageFeedback(req.SessionID, req.MessageID, req.Feedback)
+	if err != nil {
+		log.Printf("Failed to update feedback: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // HandleConfig returns the chat configuration
 func (cs *ChatServer) HandleConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
-		"chatTitle": cs.config.ChatTitle,
+		"chatTitle":      cs.config.ChatTitle,
+		"appLogo":        cs.config.AppLogo,
+		"enableFeedback": cs.config.EnableFeedback,
 	})
 }
 
@@ -1181,6 +1220,7 @@ func (cs *ChatServer) Start(staticFS fs.FS) error {
 		}
 	})
 	http.HandleFunc("/api/chat", cs.HandleChat)
+	http.HandleFunc("/api/feedback", cs.HandleFeedback)
 	http.HandleFunc("/api/mcp/tools", cs.HandleMCPTools)
 	http.HandleFunc("/api/tools/hierarchical", cs.HandleToolsHierarchical)
 	http.HandleFunc("/api/config", cs.HandleConfig)

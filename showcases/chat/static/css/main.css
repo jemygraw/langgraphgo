@@ -15,8 +15,8 @@ body {
 
 .container {
     display: flex;
-    width: 80%;
-    max-width: 60%;
+    width: 90%;
+    max-width: 100%;
     height: calc(100vh - 40px);
     margin: 0 auto;
     background: var(--bg-primary);
@@ -28,15 +28,15 @@ body {
 /* Responsive adjustments */
 @media (max-width: 1600px) {
     .container {
-        width: 85%;
-        max-width: 70%;
+        width: 92%;
+        max-width: 100%;
     }
 }
 
 @media (max-width: 1200px) {
     .container {
-        width: 90%;
-        max-width: 80%;
+        width: 95%;
+        max-width: 100%;
     }
 }
 
@@ -763,8 +763,21 @@ body {
 
 .chat-header-left {
     display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.chat-title-container {
+    display: flex;
     flex-direction: column;
     gap: 5px;
+}
+
+.app-logo {
+    height: 40px;
+    width: auto;
+    border-radius: 8px;
+    object-fit: contain;
 }
 
 .chat-header-right {
@@ -929,7 +942,6 @@ body {
 
 .message-footer {
     display: flex;
-    justify-content: space-between;
     align-items: center;
     margin-top: 15px;
     padding-top: 10px;
@@ -937,6 +949,7 @@ body {
 }
 
 .copy-btn {
+    margin-left: auto;
     cursor: pointer;
     font-size: 12px;
     color: #7f8c8d;
@@ -1388,4 +1401,35 @@ body {
     color: var(--text-primary);
     font-weight: 500;
     text-align: center;
+}
+
+/* Feedback Buttons */
+.feedback-btn {
+    cursor: pointer;
+    font-size: 14px;
+    color: #7f8c8d;
+    padding: 4px 8px;
+    border-radius: 5px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    background: none;
+    border: none;
+    margin-left: 5px;
+}
+
+.feedback-btn:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--accent-primary-hover);
+}
+
+.feedback-btn.active {
+    color: white;
+    background-color: var(--accent-primary);
+    box-shadow: var(--shadow-sm);
+}
+
+.feedback-actions {
+    display: flex;
+    align-items: center;
 }

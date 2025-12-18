@@ -13,9 +13,11 @@ import (
 
 // Message represents a single chat message
 type Message struct {
+	ID        string    `json:"id"`        // unique message id
 	Role      string    `json:"role"`      // "user" or "assistant"
 	Content   string    `json:"content"`   // message content
 	Timestamp time.Time `json:"timestamp"` // when the message was sent
+	Feedback  string    `json:"feedback"`  // "like", "dislike", or empty
 }
 
 // Session represents a chat session with history
@@ -119,16 +121,18 @@ func (sm *SessionManager) DeleteSession(id string) error {
 }
 
 // AddMessage adds a message to a session
-func (sm *SessionManager) AddMessage(sessionID, role, content string) error {
+func (sm *SessionManager) AddMessage(sessionID, role, content string) (string, error) {
 	session, err := sm.GetSession(sessionID)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	session.mu.Lock()
 	defer session.mu.Unlock()
 
+	msgID := uuid.New().String()
 	message := Message{
+		ID:        msgID,
 		Role:      role,
 		Content:   content,
 		Timestamp: time.Now(),
@@ -145,7 +149,36 @@ func (sm *SessionManager) AddMessage(sessionID, role, content string) error {
 	// Save to disk
 	sm.saveSession(session)
 
-	return nil
+	return msgID, nil
+}
+
+// UpdateMessageFeedback updates the feedback for a specific message
+func (sm *SessionManager) UpdateMessageFeedback(sessionID, messageID, feedback string) error {
+	session, err := sm.GetSession(sessionID)
+	if err != nil {
+		return err
+	}
+
+	session.mu.Lock()
+	defer session.mu.Unlock()
+
+	found := false
+	for i := range session.Messages {
+		if session.Messages[i].ID == messageID {
+			session.Messages[i].Feedback = feedback
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("message not found: %s", messageID)
+	}
+
+	session.UpdatedAt = time.Now()
+	
+	// Save to disk
+	return sm.saveSession(session)
 }
 
 // GetMessages retrieves all messages from a session

@@ -147,8 +147,10 @@
         <div class="chat-area">
             <div class="chat-header">
                 <div class="chat-header-left">
-                    <h1 id="chat-title">LangGraphGo 聊天</h1>
-                    <div class="status" id="status">选择或创建一个会话</div>
+                    <div class="chat-title-container">
+                        <h1 id="chat-title">LangGraphGo 聊天</h1>
+                        <div class="status" id="status">选择或创建一个会话</div>
+                    </div>
                 </div>
                 <div class="chat-header-right">
                     <div class="tools-status">
@@ -430,7 +432,8 @@
         let hierarchicalData = null;
         let mcpEnabled = false;
         let chatConfig = {
-            chatTitle: "LangGraphGo 聊天"
+            chatTitle: "LangGraphGo 聊天",
+            enableFeedback: true
         };
 
         // Theme Management
@@ -698,6 +701,22 @@
                     if (chatTitleElement) {
                         chatTitleElement.textContent = config.chatTitle;
                     }
+
+                    if (config.appLogo) {
+                        const headerLeft = document.querySelector('.chat-header-left');
+                        // Check if logo already exists
+                        let logoImg = document.getElementById('app-logo');
+                        if (!logoImg) {
+                            logoImg = document.createElement('img');
+                            logoImg.id = 'app-logo';
+                            logoImg.className = 'app-logo';
+                            logoImg.alt = 'Logo';
+                            // Insert before title container
+                            const titleContainer = headerLeft.querySelector('.chat-title-container');
+                            headerLeft.insertBefore(logoImg, titleContainer);
+                        }
+                        logoImg.src = config.appLogo;
+                    }
                 }
             } catch (error) {
                 console.log('Failed to load config:', error);
@@ -920,7 +939,7 @@
                     messagesDiv.innerHTML = '<div class="welcome"><h2>👋 欢迎!</h2><p>开始您的对话吧！</p></div>';
                 } else {
                     for (const msg of messages) {
-                        await addMessageToUI(msg.role, msg.content, msg.timestamp);
+                        await addMessageToUI(msg.role, msg.content, msg.timestamp, msg.id, msg.feedback);
                     }
                 }
 
@@ -996,7 +1015,7 @@
                 typingDiv.remove();
 
                 // Add assistant response
-                await addMessageToUI('assistant', data.response, new Date());
+                await addMessageToUI('assistant', data.response, new Date(), data.message_id);
             } catch (error) {
                 console.error('Failed to send message:', error);
                 typingDiv.remove();
@@ -1005,6 +1024,9 @@
         }
 
         async function sendStreamingMessage(message) {
+            // Ensure marked is loaded
+            await window.librariesLoading['marked'];
+
             // Create message container for streaming response
             let messageDiv = null;
             let messageContentDiv = null;
@@ -1091,6 +1113,7 @@
 
                                     // Stream complete - finalize the message
                                     responseText = data.message || responseText;
+                                    const messageId = data.message_id;
 
                                     if (messageContentDiv) {
                                         // Process the complete content
@@ -1139,6 +1162,29 @@
 
                                         footer.appendChild(timeDiv);
                                         footer.appendChild(copyBtn);
+
+                                        // Add feedback buttons
+                                        if (chatConfig.enableFeedback && messageId) {
+                                            const feedbackActions = document.createElement('div');
+                                            feedbackActions.className = 'feedback-actions';
+                                            
+                                            const likeBtn = document.createElement('button');
+                                            likeBtn.className = 'feedback-btn';
+                                            likeBtn.innerHTML = '👍';
+                                            likeBtn.title = 'Like';
+                                            likeBtn.onclick = () => sendFeedback(messageId, 'like', likeBtn);
+                                            
+                                            const dislikeBtn = document.createElement('button');
+                                            dislikeBtn.className = 'feedback-btn';
+                                            dislikeBtn.innerHTML = '👎';
+                                            dislikeBtn.title = 'Dislike';
+                                            dislikeBtn.onclick = () => sendFeedback(messageId, 'dislike', dislikeBtn);
+                                            
+                                            feedbackActions.appendChild(likeBtn);
+                                            feedbackActions.appendChild(dislikeBtn);
+                                            footer.appendChild(feedbackActions);
+                                        }
+
                                         messageContentDiv.appendChild(footer);
 
                                         // Process MathJax, Mermaid, and Highlight.js
@@ -1217,6 +1263,9 @@
         }
 
         function attemptMarkdownRender(text, messageContentDiv) {
+            // Check if marked is loaded
+            if (typeof marked === 'undefined') return;
+
             // Only attempt to render if we have what looks like complete markdown blocks
             // Check for code blocks, lists, headers, etc. that are properly closed
             const hasCodeBlock = text.includes('```');
@@ -1278,6 +1327,40 @@
             }
         }
 
+        async function sendFeedback(messageId, feedback, btnElement) {
+            if (!currentSessionId || !messageId) return;
+
+            try {
+                // Determine current state
+                const isLike = feedback === 'like';
+                const isDislike = feedback === 'dislike';
+                const parent = btnElement.parentElement;
+                
+                // Reset UI in the same group
+                parent.querySelectorAll('.feedback-btn').forEach(btn => btn.classList.remove('active'));
+
+                // Call API
+                const response = await fetch('/api/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: currentSessionId,
+                        message_id: messageId,
+                        feedback: feedback
+                    })
+                });
+
+                if (response.ok) {
+                    // Update UI
+                    btnElement.classList.add('active');
+                } else {
+                    console.error('Failed to send feedback');
+                }
+            } catch (error) {
+                console.error('Error sending feedback:', error);
+            }
+        }
+
         async function processSpecialContent(messageDiv, content) {
             // Check if message contains math formulas and load MathJax if needed
             if (content.includes('$') || content.includes('\\[') || content.includes('\\(')) {
@@ -1323,7 +1406,10 @@
             }
         }
 
-        async function addMessageToUI(role, content, timestamp) {
+        async function addMessageToUI(role, content, timestamp, messageId = null, feedback = null) {
+            // Ensure marked is loaded
+            await window.librariesLoading['marked'];
+
             const messagesDiv = document.getElementById('messages');
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${role}`;
@@ -1395,6 +1481,27 @@
 
                 footer.appendChild(timeDiv);
                 footer.appendChild(copyBtn);
+
+                if (chatConfig.enableFeedback && messageId) {
+                    const feedbackActions = document.createElement('div');
+                    feedbackActions.className = 'feedback-actions';
+                    
+                    const likeBtn = document.createElement('button');
+                    likeBtn.className = `feedback-btn ${feedback === 'like' ? 'active' : ''}`;
+                    likeBtn.innerHTML = '👍';
+                    likeBtn.title = 'Like';
+                    likeBtn.onclick = () => sendFeedback(messageId, 'like', likeBtn);
+                    
+                    const dislikeBtn = document.createElement('button');
+                    dislikeBtn.className = `feedback-btn ${feedback === 'dislike' ? 'active' : ''}`;
+                    dislikeBtn.innerHTML = '👎';
+                    dislikeBtn.title = 'Dislike';
+                    dislikeBtn.onclick = () => sendFeedback(messageId, 'dislike', dislikeBtn);
+                    
+                    feedbackActions.appendChild(likeBtn);
+                    feedbackActions.appendChild(dislikeBtn);
+                    footer.appendChild(feedbackActions);
+                }
 
                 messageContentDiv.innerHTML = processedContent;
                 messageContentDiv.appendChild(footer);
