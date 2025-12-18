@@ -7,7 +7,7 @@
     <title id="page-title">LangGraphGo 聊天</title>
     <link rel="icon" href="/static/images/favicon.ico" type="image/x-icon">
     <!-- Load only essential CSS immediately -->
-    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.11.1/styles/default.min.css">
+    <link rel="stylesheet" href="/static/css/highlight/default.min.css">
 
     <!-- Lazy load heavy libraries only when needed -->
     <script>
@@ -42,14 +42,16 @@
         }
 
         // Load marked.js immediately (lightweight and essential)
-        loadLibrary('marked', 'https://cdn.bootcdn.net/ajax/libs/marked/16.3.0/lib/marked.umd.min.js');
+        loadLibrary('marked', '/static/lib/marked.umd.min.js');
 
         // Load highlight.js immediately (relatively small)
-        loadLibrary('highlightjs', 'https://cdn.bootcdn.net/ajax/libs/highlight.js/11.11.1/es/highlight.min.js');
+        loadLibrary('highlightjs', '/static/lib/highlight.min.js', () => {
+            console.log('Highlight.js loaded successfully, hljs available:', typeof hljs !== 'undefined');
+        });
 
         // Lazy load Mermaid (3.3MB, only when needed)
         window.loadMermaid = function () {
-            return loadLibrary('mermaid', 'https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js', () => {
+            return loadLibrary('mermaid', '/static/lib/mermaid.min.js', () => {
                 if (typeof mermaid !== 'undefined') {
                     mermaid.initialize({
                         startOnLoad: false,
@@ -85,7 +87,7 @@
                     }
                 };
             }
-            return loadLibrary('mathjax', 'https://cdn.bootcdn.net/ajax/libs/mathjax/3.2.2/es5/tex-svg.js');
+            return loadLibrary('mathjax', '/static/lib/tex-svg.js');
         };
     </script>
     <link rel="stylesheet" href="/static/themes/themes.css?v=2">
@@ -524,7 +526,7 @@
                 const link = document.createElement('link');
                 link.id = 'code-theme-link';
                 link.rel = 'stylesheet';
-                link.href = `https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/styles/${themeName}.min.css`;
+                link.href = `/static/css/highlight/${themeName}.min.css`;
                 document.head.appendChild(link);
             } else {
                 // Use default theme (already loaded in head)
@@ -786,10 +788,71 @@
             if (mcpStatus) {
                 mcpStatus.addEventListener('click', showMCPToolsModal);
             }
+
+            // Add event delegation for artifact placeholders
+            const messagesContainer = document.getElementById('messages');
+            if (messagesContainer) {
+                messagesContainer.addEventListener('click', function(e) {
+                    const artifactPlaceholder = e.target.closest('.artifact-placeholder');
+                    if (artifactPlaceholder) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const artifactId = artifactPlaceholder.getAttribute('data-artifact-id');
+                        console.log('Artifact clicked via delegation:', artifactId);
+                        openArtifactsModal();
+                        showArtifact(artifactId);
+                    }
+                });
+            }
         });
         let sidebarCollapsed = false;
         let artifacts = new Map(); // Store artifacts by ID
         let currentArtifactId = null; // Track currently displayed artifact
+
+        // Format datetime function
+        function formatDateTime(date) {
+            const now = new Date();
+            const inputDate = new Date(date);
+
+            // Check if it's today
+            if (inputDate.toDateString() === now.toDateString()) {
+                return '今天 ' + inputDate.toLocaleTimeString('zh-CN', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+
+            // Check if it's yesterday
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            if (inputDate.toDateString() === yesterday.toDateString()) {
+                return '昨天 ' + inputDate.toLocaleTimeString('zh-CN', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+
+            // Check if it's within this week
+            const weekAgo = new Date(now);
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            if (inputDate >= weekAgo) {
+                const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+                return weekdays[inputDate.getDay()] + ' ' + inputDate.toLocaleTimeString('zh-CN', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+
+            // For older dates, show full date
+            return inputDate.toLocaleDateString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            }) + ' ' + inputDate.toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
 
         // Load config and sessions on page load - delay to improve perceived performance
         setTimeout(loadConfig, 0);
@@ -1148,7 +1211,8 @@
 
                                         // Store artifacts
                                         result.artifacts.forEach(artifact => {
-                                            artifacts.set(artifact.id, artifact);
+                                            console.log('Adding artifact:', artifact.id, artifact);
+                    artifacts.set(artifact.id, artifact);
                                         });
 
                                         // Parse Markdown now that we have the complete message
@@ -1179,11 +1243,11 @@
 
                                         const timeDiv = document.createElement('div');
                                         timeDiv.className = 'message-time';
-                                        timeDiv.textContent = new Date().toLocaleTimeString();
+                                        timeDiv.textContent = formatDateTime(new Date());
 
                                         const copyBtn = document.createElement('div');
                                         copyBtn.className = 'copy-btn';
-                                        copyBtn.innerHTML = '&#x1f4cb; <span>Copy</span>';
+                                        copyBtn.innerHTML = '&#x1f4cb; <span>复制</span>';
                                         copyBtn.setAttribute('data-raw-content', responseText);
                                         copyBtn.onclick = (e) => copyToClipboard(e);
 
@@ -1273,11 +1337,11 @@
 
                         const timeDiv = document.createElement('div');
                         timeDiv.className = 'message-time';
-                        timeDiv.textContent = new Date().toLocaleTimeString() + ' (Response incomplete)';
+                        timeDiv.textContent = formatDateTime(new Date()) + ' (响应未完成)';
 
                         const copyBtn = document.createElement('div');
                         copyBtn.className = 'copy-btn';
-                        copyBtn.innerHTML = '&#x1f4cb; <span>Copy</span>';
+                        copyBtn.innerHTML = '&#x1f4cb; <span>复制</span>';
                         copyBtn.setAttribute('data-raw-content', responseText);
                         copyBtn.onclick = (e) => copyToClipboard(e);
 
@@ -1457,20 +1521,25 @@
                 avatarDiv.innerHTML = '<span>You</span>';
             }
 
-            const time = new Date(timestamp).toLocaleTimeString();
+            const time = formatDateTime(timestamp);
             let processedContent = '';
             let extractedArtifacts = [];
 
             if (role === 'assistant') {
+                console.log('addMessageToUI: processing assistant message, content length:', content.length);
+                console.log('addMessageToUI: content preview:', content.substring(0, 200) + '...');
+
                 // First extract artifacts from content
                 const result = extractArtifacts(content);
                 extractedArtifacts = result.artifacts;
 
                 console.log('Extracted artifacts:', extractedArtifacts); // Debug log
                 console.log('Current session ID:', currentSessionId); // Debug log
+                console.log('Total artifacts in map:', artifacts.size);
 
                 // Store artifacts
                 extractedArtifacts.forEach(artifact => {
+                    console.log('Adding artifact:', artifact.id, artifact);
                     artifacts.set(artifact.id, artifact);
                 });
 
@@ -1514,7 +1583,7 @@
             if (role === 'assistant') {
                 const copyBtn = document.createElement('div');
                 copyBtn.className = 'copy-btn';
-                copyBtn.innerHTML = '&#x1f4cb; <span>Copy</span>';
+                copyBtn.innerHTML = '&#x1f4cb; <span>复制</span>';
                 copyBtn.setAttribute('data-raw-content', content);
                 copyBtn.onclick = (e) => copyToClipboard(e);
 
@@ -1645,7 +1714,7 @@
             const rawContent = button.getAttribute('data-raw-content');
             navigator.clipboard.writeText(rawContent).then(() => {
                 const originalText = button.innerHTML;
-                button.innerHTML = '✓ Copied!';
+                button.innerHTML = '✓ 已复制!';
                 button.style.color = '#27ae60'; // Green color for success
                 setTimeout(() => {
                     button.innerHTML = originalText;
@@ -1730,6 +1799,7 @@
 
         // Artifacts Functions
         function extractArtifacts(content) {
+            console.log('extractArtifacts called with content length:', content.length);
             const artifacts = [];
             let processedContent = content;
 
@@ -1852,15 +1922,15 @@
             // Clear current artifacts
             artifacts.clear();
             currentArtifactId = null;
+            isArtifactsOpen = false;
 
             // Update display
             updateArtifactsDisplay();
 
-            // Close sidebar
-            if (isArtifactsOpen) {
-                const artifactsSidebar = document.getElementById('artifacts-sidebar');
+            // Close artifacts sidebar if open
+            const artifactsSidebar = document.getElementById('artifacts-sidebar');
+            if (artifactsSidebar) {
                 artifactsSidebar.classList.add('collapsed');
-                isArtifactsOpen = false;
             }
         }
 
@@ -1919,8 +1989,17 @@
         }
 
         function showArtifact(artifactId) {
+            console.log('showArtifact called with ID:', artifactId);
+            console.log('Available artifacts:', Array.from(artifacts.keys()));
+
             const artifact = artifacts.get(artifactId);
             if (!artifact) {
+                console.error('Artifact not found:', artifactId);
+                // Show error message to user
+                const content = document.getElementById('artifacts-content');
+                if (content) {
+                    content.innerHTML = '<div class="artifact-error">Artifact not found: ' + artifactId + '</div>';
+                }
                 return;
             }
 
@@ -1941,7 +2020,12 @@
 
             // Show artifact content
             const content = document.getElementById('artifacts-content');
-            content.innerHTML = '<div class="artifact-full">' + renderArtifactContent(artifact) + '</div>';
+            renderArtifactContent(artifact).then(html => {
+                content.innerHTML = '<div class="artifact-full">' + html + '</div>';
+            }).catch(error => {
+                console.error('Error rendering artifact content:', error);
+                content.innerHTML = '<div class="artifact-error">Error rendering artifact: ' + error.message + '</div>';
+            });
         }
 
         function getTypeIcon(type) {
@@ -1974,15 +2058,37 @@
             return icons[type] || '📄';
         }
 
-        function renderArtifactContent(artifact) {
+        async function renderArtifactContent(artifact) {
+            console.log('renderArtifactContent called with type:', artifact.type, 'title:', artifact.title);
             const { type, content, language } = artifact;
+
+            // Wait for highlight.js if needed
+            if (typeof hljs === 'undefined' && window.librariesLoading['highlightjs']) {
+                console.log('Waiting for highlight.js to load...');
+                await window.librariesLoading['highlightjs'];
+                console.log('Highlight.js loaded, hljs available:', typeof hljs !== 'undefined');
+            }
 
             switch (type) {
                 case 'html':
-                    return `<iframe srcdoc="${escapeHtml(content)}"></iframe>`;
+                    return `
+                        <div class="artifact-actions">
+                            <button class="artifact-copy-btn" onclick="copyArtifactContent('${artifact.id}', 'html')" title="复制代码">
+                                📋 复制
+                            </button>
+                        </div>
+                        <iframe srcdoc="${escapeHtml(content)}"></iframe>
+                    `;
 
                 case 'svg':
-                    return content;
+                    return `
+                        <div class="artifact-actions">
+                            <button class="artifact-copy-btn" onclick="copyArtifactContent('${artifact.id}', 'svg')" title="复制 SVG">
+                                📋 复制
+                            </button>
+                        </div>
+                        ${content}
+                    `;
 
                 case 'python':
                 case 'javascript':
@@ -2012,6 +2118,19 @@
                 case 'kotlin':
                 case 'text':
                 default:
+                    // Check if hljs is available
+                    if (typeof hljs === 'undefined') {
+                        console.warn('hljs not available, using plain text');
+                        return `
+                            <div class="artifact-actions">
+                                <button class="artifact-copy-btn" onclick="copyArtifactContent('${artifact.id}', 'text')" title="复制代码">
+                                    📋 复制
+                                </button>
+                            </div>
+                            <pre><code>${escapeHtml(content)}</code></pre>
+                        `;
+                    }
+
                     // Map types to highlight.js languages
                     const langMap = {
                         'js': 'javascript',
@@ -2024,16 +2143,142 @@
                     const hlLang = langMap[type] || language || type;
 
                     // Try to highlight, fallback to plaintext if language not supported
-                    let highlighted;
                     try {
-                        highlighted = hljs.highlight(content, { language: hlLang }).value;
+                        let highlighted;
+                        if (hlLang && hlLang !== 'plaintext') {
+                            highlighted = hljs.highlight(content, { language: hlLang }).value;
+                        } else {
+                            highlighted = hljs.highlight(content, { language: 'plaintext' }).value;
+                        }
+                        return `
+                            <div class="artifact-actions">
+                                <button class="artifact-copy-btn" onclick="copyArtifactContent('${artifact.id}', 'code')" title="复制代码">
+                                    📋 复制
+                                </button>
+                            </div>
+                            <pre><code>${highlighted}</code></pre>
+                        `;
                     } catch (e) {
-                        highlighted = hljs.highlight(content, { language: 'plaintext' }).value;
+                        console.warn('Highlight failed for language:', hlLang, e);
+                        return `
+                            <div class="artifact-actions">
+                                <button class="artifact-copy-btn" onclick="copyArtifactContent('${artifact.id}', 'text')" title="复制代码">
+                                    📋 复制
+                                </button>
+                            </div>
+                            <pre><code>${escapeHtml(content)}</code></pre>
+                        `;
                     }
-                    return `<pre><code>${highlighted}</code></pre>`;
             }
         }
 
+        // Artifact Copy Function
+        function copyArtifactContent(artifactId, contentType) {
+            console.log('Copying artifact:', artifactId, 'type:', contentType);
+
+            const artifact = artifacts.get(artifactId);
+            if (!artifact) {
+                console.error('Artifact not found:', artifactId);
+                showNotification('Artifact not found', 'error');
+                return;
+            }
+
+            let textToCopy = '';
+
+            switch (contentType) {
+                case 'html':
+                    textToCopy = artifact.content;
+                    break;
+                case 'svg':
+                    textToCopy = artifact.content;
+                    break;
+                case 'code':
+                case 'text':
+                default:
+                    textToCopy = artifact.content;
+                    break;
+            }
+
+            // Use modern clipboard API
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(textToCopy)
+                    .then(() => {
+                        console.log('Artifact copied successfully');
+                        showNotification('代码已复制到剪贴板', 'success');
+
+                        // Update button text temporarily
+                        const button = document.querySelector(`.artifact-copy-btn[onclick*="copyArtifactContent('${artifactId}', '${contentType}')"]`);
+                        if (button) {
+                            const originalText = button.innerHTML;
+                            button.innerHTML = '✅ 已复制';
+                            button.disabled = true;
+                            setTimeout(() => {
+                                button.innerHTML = originalText;
+                                button.disabled = false;
+                            }, 2000);
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Failed to copy artifact:', err);
+                        // Fallback to older method
+                        fallbackCopyText(textToCopy);
+                    });
+            } else {
+                // Fallback for older browsers
+                fallbackCopyText(textToCopy);
+            }
+        }
+
+        function fallbackCopyText(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+
+            try {
+                textArea.focus();
+                textArea.select();
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    console.log('Artifact copied successfully (fallback)');
+                    showNotification('代码已复制到剪贴板', 'success');
+                } else {
+                    throw new Error('Copy command failed');
+                }
+            } catch (err) {
+                console.error('Fallback copy failed:', err);
+                showNotification('复制失败，请手动复制', 'error');
+            }
+
+            document.body.removeChild(textArea);
+        }
+
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.textContent = message;
+
+            // Add to page
+            document.body.appendChild(notification);
+
+            // Show notification
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 100);
+
+            // Hide after 3 seconds
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        document.body.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
 
         // Tools Functions
         let toolsRefreshInterval = null; // Store interval ID for cleanup

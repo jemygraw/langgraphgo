@@ -46,7 +46,7 @@ func getEnvOrDefault(key, defaultValue string) string {
 func GetConfig() Config {
 	return Config{
 		ChatTitle:      getEnvOrDefault("CHAT_TITLE", "LangGraphGo 聊天"),
-		AppLogo:        getEnvOrDefault("APP_LOGO", "https://github.com/smallnest/lango-website/blob/master/images/logo/lango5.png?raw=true"),
+		AppLogo:        getEnvOrDefault("APP_LOGO", "/static/images/lango.png"),
 		OpenAIAPIKey:   os.Getenv("OPENAI_API_KEY"),
 		OpenAIModel:    getEnvOrDefault("OPENAI_MODEL", "gpt-4o-mini"),
 		OpenAIBaseURL:  os.Getenv("OPENAI_BASE_URL"),
