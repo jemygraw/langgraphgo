@@ -1595,6 +1595,28 @@ body {
     }
 }
 
+.logout-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    cursor: pointer;
+    transition: all 0.3s;
+    color: var(--text-primary);
+    margin-left: 5px;
+}
+
+.logout-btn:hover {
+    background: #fee2e2;
+    border-color: #ef4444;
+    color: #dc2626;
+    transform: scale(1.1);
+}
+
 /* Responsive notifications */
 @media (max-width: 768px) {
     .notification {

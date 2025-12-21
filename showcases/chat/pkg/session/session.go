@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -29,35 +30,121 @@ type Session struct {
 	mu        sync.RWMutex
 }
 
-// SessionManager manages multiple chat sessions
+// SessionStore defines the interface for session persistence
+type SessionStore interface {
+	Save(session *Session) error
+	Load(id string) (*Session, error)
+	Delete(id string) error
+	List() ([]*Session, error)
+}
+
+// FileSessionStore implements SessionStore using local files
+type FileSessionStore struct {
+	sessionDir string
+}
+
+// NewFileSessionStore creates a new FileSessionStore
+func NewFileSessionStore(sessionDir string) *FileSessionStore {
+	os.MkdirAll(sessionDir, 0755)
+	return &FileSessionStore{sessionDir: sessionDir}
+}
+
+func (s *FileSessionStore) Save(session *Session) error {
+	// Only save sessions that have messages
+	if len(session.Messages) == 0 {
+		// If the session has no messages, don't save it to disk
+		// If it exists on disk from before, delete it
+		filePath := filepath.Join(s.sessionDir, fmt.Sprintf("%s.json", session.ID))
+		if _, err := os.Stat(filePath); err == nil {
+			// File exists, delete it
+			os.Remove(filePath)
+		}
+		return nil
+	}
+
+	filePath := filepath.Join(s.sessionDir, fmt.Sprintf("%s.json", session.ID))
+
+	data, err := json.MarshalIndent(session, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal session: %w", err)
+	}
+
+	err = os.WriteFile(filePath, data, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write session file: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileSessionStore) Load(id string) (*Session, error) {
+	filePath := filepath.Join(s.sessionDir, id+".json")
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("session file not found: %s", id)
+	}
+
+	var session Session
+	err = json.Unmarshal(data, &session)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal session: %v", err)
+	}
+
+	return &session, nil
+}
+
+func (s *FileSessionStore) Delete(id string) error {
+	filePath := filepath.Join(s.sessionDir, fmt.Sprintf("%s.json", id))
+	return os.Remove(filePath)
+}
+
+func (s *FileSessionStore) List() ([]*Session, error) {
+	files, err := os.ReadDir(s.sessionDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var sessions []*Session
+	for _, file := range files {
+		if filepath.Ext(file.Name()) != ".json" {
+			continue
+		}
+
+		id := strings.TrimSuffix(file.Name(), ".json")
+		session, err := s.Load(id)
+		if err != nil {
+			continue
+		}
+
+		// Only include sessions that have messages
+		if len(session.Messages) > 0 {
+			sessions = append(sessions, session)
+		}
+	}
+	return sessions, nil
+}
+
+// SessionManager manages multiple chat sessions with an in-memory cache
 type SessionManager struct {
 	sessions   map[string]*Session
-	sessionDir string
+	store      SessionStore
 	maxHistory int
 	mu         sync.RWMutex
 }
 
 // NewSessionManager creates a new session manager
-func NewSessionManager(sessionDir string, maxHistory int) *SessionManager {
-	// Create sessions directory if it doesn't exist
-	os.MkdirAll(sessionDir, 0755)
-
+func NewSessionManager(store SessionStore, maxHistory int) *SessionManager {
 	sm := &SessionManager{
 		sessions:   make(map[string]*Session),
-		sessionDir: sessionDir,
+		store:      store,
 		maxHistory: maxHistory,
 	}
 
-	// Don't load all sessions at startup anymore
-	// Sessions will be loaded on-demand to improve startup performance
-	// sm.loadSessions()
+	// Load all sessions at startup
+	sm.loadSessions()
 
 	return sm
-}
-
-// GetSessionDir returns the session directory
-func (sm *SessionManager) GetSessionDir() string {
-	return sm.sessionDir
 }
 
 // GetMaxHistory returns the maximum history length
@@ -78,14 +165,11 @@ func (sm *SessionManager) CreateSession() *Session {
 	}
 
 	sm.sessions[session.ID] = session
-	// Don't save new sessions until they have messages
-
 	return session
 }
 
-// GetSession retrieves a session by ID (lazy loads from disk if not in memory)
+// GetSession retrieves a session by ID (lazy loads from store if not in memory)
 func (sm *SessionManager) GetSession(id string) (*Session, error) {
-	// First check if session is already loaded
 	sm.mu.RLock()
 	session, exists := sm.sessions[id]
 	sm.mu.RUnlock()
@@ -94,8 +178,18 @@ func (sm *SessionManager) GetSession(id string) (*Session, error) {
 		return session, nil
 	}
 
-	// Try to load from disk
-	return sm.loadSessionFromDisk(id)
+	// Try to load from store
+	session, err := sm.store.Load(id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Store in memory for future access
+	sm.mu.Lock()
+	sm.sessions[id] = session
+	sm.mu.Unlock()
+
+	return session, nil
 }
 
 // ListSessions returns all active sessions
@@ -117,10 +211,7 @@ func (sm *SessionManager) DeleteSession(id string) error {
 	defer sm.mu.Unlock()
 
 	delete(sm.sessions, id)
-
-	// Delete from disk
-	filePath := filepath.Join(sm.sessionDir, fmt.Sprintf("%s.json", id))
-	return os.Remove(filePath)
+	return sm.store.Delete(id)
 }
 
 // AddMessage adds a message to a session
@@ -144,13 +235,12 @@ func (sm *SessionManager) AddMessage(sessionID, role, content string) (string, e
 	session.Messages = append(session.Messages, message)
 	session.UpdatedAt = time.Now()
 
-	// Trim history if too long
 	if sm.maxHistory > 0 && len(session.Messages) > sm.maxHistory {
 		session.Messages = session.Messages[len(session.Messages)-sm.maxHistory:]
 	}
 
-	// Save to disk
-	sm.saveSession(session)
+	// Save to store
+	sm.store.Save(session)
 
 	return msgID, nil
 }
@@ -179,9 +269,7 @@ func (sm *SessionManager) UpdateMessageFeedback(sessionID, messageID, feedback s
 	}
 
 	session.UpdatedAt = time.Now()
-	
-	// Save to disk
-	return sm.saveSession(session)
+	return sm.store.Save(session)
 }
 
 // GetMessages retrieves all messages from a session
@@ -194,94 +282,23 @@ func (sm *SessionManager) GetMessages(sessionID string) ([]Message, error) {
 	session.mu.RLock()
 	defer session.mu.RUnlock()
 
-	// Return a copy to prevent external modification
 	messages := make([]Message, len(session.Messages))
 	copy(messages, session.Messages)
 
 	return messages, nil
 }
 
-// saveSession saves a session to disk
-func (sm *SessionManager) saveSession(session *Session) error {
-	// Only save sessions that have messages
-	if len(session.Messages) == 0 {
-		// If the session has no messages, don't save it to disk
-		// If it exists on disk from before, delete it
-		filePath := filepath.Join(sm.sessionDir, fmt.Sprintf("%s.json", session.ID))
-		if _, err := os.Stat(filePath); err == nil {
-			// File exists, delete it
-			os.Remove(filePath)
-		}
-		return nil
-	}
-
-	filePath := filepath.Join(sm.sessionDir, fmt.Sprintf("%s.json", session.ID))
-
-	data, err := json.MarshalIndent(session, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal session: %w", err)
-	}
-
-	err = os.WriteFile(filePath, data, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to write session file: %w", err)
-	}
-
-	return nil
-}
-
-// loadSessions loads all sessions from disk
 func (sm *SessionManager) loadSessions() {
-	files, err := os.ReadDir(sm.sessionDir)
+	sessions, err := sm.store.List()
 	if err != nil {
-		return // Directory might not exist yet
+		return
 	}
 
-	for _, file := range files {
-		if filepath.Ext(file.Name()) != ".json" {
-			continue
-		}
-
-		filePath := filepath.Join(sm.sessionDir, file.Name())
-		data, err := os.ReadFile(filePath)
-		if err != nil {
-			continue
-		}
-
-		var session Session
-		err = json.Unmarshal(data, &session)
-		if err != nil {
-			continue
-		}
-
-		// Only load sessions that have messages
-		if len(session.Messages) > 0 {
-			sm.sessions[session.ID] = &session
-		}
-	}
-}
-
-// loadSessionFromDisk loads a specific session from disk
-func (sm *SessionManager) loadSessionFromDisk(sessionID string) (*Session, error) {
-	filePath := filepath.Join(sm.sessionDir, sessionID+".json")
-
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("session file not found: %s", sessionID)
-	}
-
-	var session Session
-	err = json.Unmarshal(data, &session)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal session: %v", err)
-	}
-
-	// Store in memory for future access
 	sm.mu.Lock()
-	sm.sessions[sessionID] = &session
-	sm.mu.Unlock()
-
-	return &session, nil
+	defer sm.mu.Unlock()
+	for _, s := range sessions {
+		sm.sessions[s.ID] = s
+	}
 }
 
 // ClearHistory clears all messages in a session
@@ -297,9 +314,5 @@ func (sm *SessionManager) ClearHistory(sessionID string) error {
 	session.Messages = make([]Message, 0)
 	session.UpdatedAt = time.Now()
 
-	// Delete the file from disk since the session has no messages
-	filePath := filepath.Join(sm.sessionDir, fmt.Sprintf("%s.json", session.ID))
-	os.Remove(filePath)
-
-	return nil
+	return sm.store.Save(session)
 }
