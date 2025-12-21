@@ -14,7 +14,6 @@ type BaseEngine struct {
 	metrics   *Metrics
 }
 
-
 // NewBaseEngine creates a new base RAG engine
 func NewBaseEngine(retriever Retriever, embedder Embedder, config *Config) *BaseEngine {
 	if config == nil {
@@ -97,9 +96,9 @@ func (e *BaseEngine) QueryWithConfig(ctx context.Context, query string, config *
 	confidence := e.calculateConfidence(searchResults)
 
 	return &QueryResult{
-		Query:    query,
-		Sources:  docs,
-		Context:  context,
+		Query:   query,
+		Sources: docs,
+		Context: context,
 		Metadata: map[string]any{
 			"retrieval_config": config,
 			"num_documents":    len(docs),

@@ -121,11 +121,11 @@ func (m *MemoryGraph) GetRelatedEntities(ctx context.Context, entityID string, m
 
 	// Simple implementation for depth 1
 	// For maxDepth > 1, would need BFS
-	
+
 	// Find relationships connected to this entity
 	for _, rel := range m.relationships {
 		// Note: relationshipType filter not in signature anymore, maxDepth added
-		
+
 		if rel.Source == entityID {
 			if !visited[rel.Target] {
 				visited[rel.Target] = true

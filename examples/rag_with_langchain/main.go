@@ -125,7 +125,7 @@ Key features of LangGraph include:
 
 	// Build pipeline
 
-pipeline := rag.NewRAGPipeline(config)
+	pipeline := rag.NewRAGPipeline(config)
 	err = pipeline.BuildBasicRAG()
 	if err != nil {
 		log.Fatalf("Failed to build RAG pipeline: %v", err)

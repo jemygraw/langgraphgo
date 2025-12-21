@@ -99,7 +99,7 @@ Popular Go frameworks and libraries:
 
 	// Add documents to Chroma
 	fmt.Println("Adding documents to Chroma...")
-	
+
 	// LangChain adapter/store handles embeddings
 	err = vectorStore.Add(ctx, chunks)
 	if err != nil {
@@ -110,7 +110,7 @@ Popular Go frameworks and libraries:
 
 	// Build RAG pipeline
 	fmt.Println("Building RAG pipeline...")
-	
+
 	// Use LangChain retriever adapter
 	retriever := rag.NewLangChainRetriever(chromaStore, 3)
 
@@ -185,7 +185,7 @@ Popular Go frameworks and libraries:
 	fmt.Println(strings.Repeat("-", 80))
 
 	searchQuery := "concurrency in Go"
-	
+
 	results, err := retriever.RetrieveWithConfig(ctx, searchQuery, &rag.RetrievalConfig{K: 5})
 	if err != nil {
 		log.Printf("Search failed: %v", err)

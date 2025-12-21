@@ -306,7 +306,7 @@ func (r *LangChainRetriever) RetrieveWithConfig(ctx context.Context, query strin
 	}
 
 	// Use SimilaritySearch
-	// Note: Generic SimilaritySearch doesn't return scores. 
+	// Note: Generic SimilaritySearch doesn't return scores.
 	// If the underlying store supports SimilaritySearchWithScore, we can't access it via the generic interface easily here.
 	docs, err := r.store.SimilaritySearch(ctx, query, k)
 	if err != nil {
@@ -335,7 +335,7 @@ func (r *LangChainRetriever) RetrieveWithConfig(ctx context.Context, query strin
 			Score: score,
 		}
 	}
-	
+
 	// Apply threshold if possible (post-filtering)
 	if config != nil && config.ScoreThreshold > 0 {
 		var filtered []DocumentSearchResult

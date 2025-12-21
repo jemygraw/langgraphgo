@@ -66,7 +66,7 @@ func (a *vectorStoreRetrieverAdapter) RetrieveWithConfig(ctx context.Context, qu
 	// Perform search
 	var results []rag.DocumentSearchResult
 
-	if config.Filter != nil && len(config.Filter) > 0 {
+	if len(config.Filter) > 0 {
 		results, err = a.vectorStore.SearchWithFilter(ctx, queryEmbedding, config.K, config.Filter)
 	} else {
 		results, err = a.vectorStore.Search(ctx, queryEmbedding, config.K)
@@ -112,7 +112,7 @@ type VectorRAGEngine struct {
 // NewVectorRAGEngine creates a new vector RAG engine
 func NewVectorRAGEngine(llm rag.LLMInterface, embedder rag.Embedder, vectorStore rag.VectorStore, k int) (*VectorRAGEngine, error) {
 	config := rag.VectorRAGConfig{
-		ChunkSize:   1000,
+		ChunkSize:    1000,
 		ChunkOverlap: 200,
 		RetrieverConfig: rag.RetrievalConfig{
 			K:              k,
@@ -178,26 +178,28 @@ func (v *VectorRAGEngine) Query(ctx context.Context, query string) (*rag.QueryRe
 
 	// Apply reranking if enabled
 	if v.config.EnableReranking && v.config.RetrieverConfig.SearchType != "mmr" {
-		searchResults, err = v.rerankResults(ctx, query, searchResults)
+		searchResults2, err := v.rerankResults(ctx, query, searchResults)
 		if err != nil {
 			// Continue without reranking if it fails
-			searchResults = searchResults // Use original results
+			// searchResults = searchResults // Use original results
+		} else {
+			searchResults = searchResults2
 		}
 	}
 
 	if len(searchResults) == 0 {
 		return &rag.QueryResult{
-			Query:      query,
-			Answer:     "No relevant information found.",
-			Sources:    []rag.Document{},
-			Context:    "",
-			Confidence: 0.0,
-			Metadata: map[string]any{
-				"engine_type": "vector_rag",
-				"search_type": v.config.RetrieverConfig.SearchType,
+				Query:      query,
+				Answer:     "No relevant information found.",
+				Sources:    []rag.Document{},
+				Context:    "",
+				Confidence: 0.0,
+				Metadata: map[string]any{
+					"engine_type": "vector_rag",
+					"search_type": v.config.RetrieverConfig.SearchType,
+				},
 			},
-		},
-		nil
+			nil
 	}
 
 	// Extract documents from search results
@@ -268,21 +270,18 @@ func (v *VectorRAGEngine) QueryWithConfig(ctx context.Context, query string, con
 
 	// Apply reranking if enabled
 	if v.config.EnableReranking {
-		filteredResults, err = v.rerankResults(ctx, query, filteredResults)
-		if err != nil {
-			// Continue without reranking if it fails
-		}
+		filteredResults, _ = v.rerankResults(ctx, query, filteredResults)
 	}
 
 	if len(filteredResults) == 0 {
 		return &rag.QueryResult{
-			Query:      query,
-			Answer:     "No relevant information found.",
-			Sources:    []rag.Document{},
-			Context:    "",
-			Confidence: 0.0,
-		},
-		nil
+				Query:      query,
+				Answer:     "No relevant information found.",
+				Sources:    []rag.Document{},
+				Context:    "",
+				Confidence: 0.0,
+			},
+			nil
 	}
 
 	// Extract documents from search results
@@ -306,13 +305,13 @@ func (v *VectorRAGEngine) QueryWithConfig(ctx context.Context, query string, con
 		Confidence:   confidence,
 		ResponseTime: responseTime,
 		Metadata: map[string]any{
-			"engine_type":       "vector_rag",
-			"search_type":       config.SearchType,
-			"num_results":       len(filteredResults),
-			"avg_score":         confidence,
-			"reranking_used":    v.config.EnableReranking,
-			"score_threshold":   config.ScoreThreshold,
-			"filters_applied":   config.Filter != nil,
+			"engine_type":     "vector_rag",
+			"search_type":     config.SearchType,
+			"num_results":     len(filteredResults),
+			"avg_score":       confidence,
+			"reranking_used":  v.config.EnableReranking,
+			"score_threshold": config.ScoreThreshold,
+			"filters_applied": config.Filter != nil,
 		},
 	}, nil
 }

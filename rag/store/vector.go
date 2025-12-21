@@ -118,13 +118,11 @@ func (s *InMemoryVectorStore) SearchWithFilter(ctx context.Context, queryEmbeddi
 	// Filter documents first
 	var filteredDocs []rag.Document
 	var filteredEmbeddings [][]float32
-	var filteredIndices []int
 
 	for i, doc := range s.documents {
 		if s.matchesFilter(doc, filter) {
 			filteredDocs = append(filteredDocs, doc)
 			filteredEmbeddings = append(filteredEmbeddings, s.embeddings[i])
-			filteredIndices = append(filteredIndices, i)
 		}
 	}
 
@@ -184,7 +182,7 @@ func (s *InMemoryVectorStore) Delete(ctx context.Context, ids []string) error {
 			newEmbeddings = append(newEmbeddings, s.embeddings[i])
 		}
 	}
-	
+
 	s.documents = newDocs
 	s.embeddings = newEmbeddings
 	return nil
@@ -216,7 +214,7 @@ func (s *InMemoryVectorStore) Update(ctx context.Context, documents []rag.Docume
 				return fmt.Errorf("failed to embed document %s: %w", doc.ID, err)
 			}
 		}
-		
+
 		found := false
 		for i, existingDoc := range s.documents {
 			if existingDoc.ID == doc.ID {

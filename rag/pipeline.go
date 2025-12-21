@@ -72,10 +72,65 @@ func NewRAGPipeline(config *PipelineConfig) *RAGPipeline {
 		config = DefaultPipelineConfig()
 	}
 
+	g := graph.NewStateGraph()
+	g.SetSchema(&ragStateSchema{})
+
 	return &RAGPipeline{
 		config: config,
-		graph:  graph.NewStateGraph(),
+		graph:  g,
 	}
+}
+
+type ragStateSchema struct{}
+
+func (s *ragStateSchema) Init() any {
+	return RAGState{
+		Metadata: make(map[string]any),
+	}
+}
+
+func (s *ragStateSchema) Update(current, new any) (any, error) {
+	currState, ok := current.(RAGState)
+	if !ok {
+		return new, nil
+	}
+	newState, ok := new.(RAGState)
+	if !ok {
+		return current, nil
+	}
+
+	// Simple overwrite for now, but ensure we don't lose data
+	if newState.Query != "" {
+		currState.Query = newState.Query
+	}
+	if newState.Context != "" {
+		currState.Context = newState.Context
+	}
+	if newState.Answer != "" {
+		currState.Answer = newState.Answer
+	}
+	if len(newState.Documents) > 0 {
+		currState.Documents = newState.Documents
+	}
+	if len(newState.RetrievedDocuments) > 0 {
+		currState.RetrievedDocuments = newState.RetrievedDocuments
+	}
+	if len(newState.RankedDocuments) > 0 {
+		currState.RankedDocuments = newState.RankedDocuments
+	}
+	if len(newState.Citations) > 0 {
+		currState.Citations = newState.Citations
+	}
+	if newState.Metadata != nil {
+		if currState.Metadata == nil {
+			currState.Metadata = make(map[string]any)
+		}
+		for k, v := range newState.Metadata {
+			currState.Metadata[k] = v
+		}
+	}
+
+	return currState, nil
 }
 
 // BuildBasicRAG builds a basic RAG pipeline: Retrieve -> Generate
@@ -286,6 +341,7 @@ func (p *RAGPipeline) fallbackSearchNode(ctx context.Context, state any) (any, e
 
 func (p *RAGPipeline) generateNode(ctx context.Context, state any) (any, error) {
 	ragState := state.(RAGState)
+	// fmt.Printf("DEBUG generateNode: state.Documents len = %d\n", len(ragState.Documents))
 
 	// Build context from retrieved documents
 	var contextParts []string
@@ -338,10 +394,10 @@ func (p *RAGPipeline) formatCitationsNode(ctx context.Context, state any) (any, 
 
 // RAGDocument represents a document with content and metadata (for pipeline compatibility)
 type RAGDocument struct {
-	Content   string            `json:"content"`
-	Metadata  map[string]any     `json:"metadata"`
-	CreatedAt time.Time         `json:"created_at"`
-	UpdatedAt time.Time         `json:"updated_at"`
+	Content   string         `json:"content"`
+	Metadata  map[string]any `json:"metadata"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
 }
 
 // ConvertToDocument converts RAGDocument to Document

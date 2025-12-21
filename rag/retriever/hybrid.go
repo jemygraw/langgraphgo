@@ -127,11 +127,11 @@ func (h *HybridRetriever) combineResults(allResults [][]rag.DocumentSearchResult
 			} else {
 				// Add new document
 				documentScores[docID] = &CombinedDocumentScore{
-					Document:        result.Document,
-					TotalScore:      float64(result.Score) * weight,
-					RetrieverCount:  1,
-					Sources:         []string{fmt.Sprintf("retriever_%d", retrieverIdx)},
-					Metadata:        result.Metadata,
+					Document:       result.Document,
+					TotalScore:     float64(result.Score) * weight,
+					RetrieverCount: 1,
+					Sources:        []string{fmt.Sprintf("retriever_%d", retrieverIdx)},
+					Metadata:       result.Metadata,
 				}
 			}
 		}
@@ -157,8 +157,8 @@ func (h *HybridRetriever) combineResults(allResults [][]rag.DocumentSearchResult
 			Document: combined.Document,
 			Score:    finalScore,
 			Metadata: map[string]any{
-				"retriever_count": combined.RetrieverCount,
-				"sources":         combined.Sources,
+				"retriever_count":   combined.RetrieverCount,
+				"sources":           combined.Sources,
 				"original_metadata": combined.Metadata,
 			},
 		}

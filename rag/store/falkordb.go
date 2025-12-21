@@ -7,19 +7,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/redis/go-redis/v9"
 	"github.com/smallnest/langgraphgo/rag"
 )
 
 // FalkorDBGraph implements a FalkorDB knowledge graph
 type FalkorDBGraph struct {
-	graph *Graph
-	pool  *redis.Pool // Use pool for thread safety if needed, but for now single conn is fine or we can just hold the graph which holds the conn. 
-	// The internal Graph struct holds a redis.Conn. redis.Conn is not thread safe.
-	// We should probably recreate the Graph wrapper or Conn per request if we want concurrency, 
-	// but the interface is a single object.
-	// For this implementation, we will assume single threaded or we need a pool.
-	// Let's stick to the simple internal implementation: The internal Graph holds a Conn.
+	client    redis.UniversalClient
+	graphName string
 }
 
 // NewFalkorDBGraph creates a new FalkorDB knowledge graph
@@ -31,28 +26,29 @@ func NewFalkorDBGraph(connectionString string) (rag.KnowledgeGraph, error) {
 	}
 
 	addr := u.Host
+	if addr == "" {
+		return nil, fmt.Errorf("invalid connection string: missing host")
+	}
 	graphName := strings.TrimPrefix(u.Path, "/")
 	if graphName == "" {
 		graphName = "rag"
 	}
 
-	// Create a Redis connection
-	conn, err := redis.Dial("tcp", addr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to Redis/FalkorDB: %w", err)
-	}
-
-	// Initialize the internal Graph struct
-	// Note: We use the internal NewGraph function
-	g := NewGraph(graphName, conn)
+	// Create a go-redis client
+	client := redis.NewClient(&redis.Options{
+		Addr: addr,
+	})
 
 	return &FalkorDBGraph{
-		graph: &g,
+		client:    client,
+		graphName: graphName,
 	}, nil
 }
 
 // AddEntity adds an entity to the graph
 func (f *FalkorDBGraph) AddEntity(ctx context.Context, entity *rag.Entity) error {
+	g := NewGraph(f.graphName, f.client)
+
 	label := sanitizeLabel(entity.Type)
 	props := entityToMap(entity)
 	propsStr := propsToString(props)
@@ -60,26 +56,30 @@ func (f *FalkorDBGraph) AddEntity(ctx context.Context, entity *rag.Entity) error
 	// Using MERGE to avoid duplicates
 	query := fmt.Sprintf("MERGE (n:%s {id: '%s'}) SET n += %s", label, entity.ID, propsStr)
 
-	_, err := f.graph.Query(query)
+	_, err := g.Query(ctx, query)
 	return err
 }
 
 // AddRelationship adds a relationship to the graph
 func (f *FalkorDBGraph) AddRelationship(ctx context.Context, rel *rag.Relationship) error {
+	g := NewGraph(f.graphName, f.client)
+
 	relType := sanitizeLabel(rel.Type)
 	props := relationshipToMap(rel)
 	propsStr := propsToString(props)
 
 	// MATCH source and target, then MERGE relationship
-	query := fmt.Sprintf("MATCH (a {id: '%s'}), (b {id: '%s'}) MERGE (a)-[r:%s {id: '%s'}]->(b) SET r += %s", 
+	query := fmt.Sprintf("MATCH (a {id: '%s'}), (b {id: '%s'}) MERGE (a)-[r:%s {id: '%s'}]->(b) SET r += %s",
 		rel.Source, rel.Target, relType, rel.ID, propsStr)
 
-	_, err := f.graph.Query(query)
+	_, err := g.Query(ctx, query)
 	return err
 }
 
 // Query performs a graph query
 func (f *FalkorDBGraph) Query(ctx context.Context, query *rag.GraphQuery) (*rag.GraphQueryResult, error) {
+	g := NewGraph(f.graphName, f.client)
+
 	cypher := "MATCH (n)-[r]->(m)"
 	where := []string{}
 
@@ -110,16 +110,13 @@ func (f *FalkorDBGraph) Query(ctx context.Context, query *rag.GraphQuery) (*rag.
 		cypher += " WHERE " + strings.Join(where, " AND ")
 	}
 
-	// We need to return properties to reconstruct entities
-	// Returning nodes and edges as maps?
-	// FalkorDB Cypher: RETURN n, r, m
 	cypher += " RETURN n, r, m"
-	
+
 	if query.Limit > 0 {
 		cypher += fmt.Sprintf(" LIMIT %d", query.Limit)
 	}
 
-	qr, err := f.graph.Query(cypher)
+	qr, err := g.Query(ctx, cypher)
 	if err != nil {
 		return nil, err
 	}
@@ -132,29 +129,15 @@ func (f *FalkorDBGraph) Query(ctx context.Context, query *rag.GraphQuery) (*rag.
 	seenEntities := make(map[string]bool)
 	seenRels := make(map[string]bool)
 
-	// Parse results
-	// The internal Query returns [][]interface{}
-	// Each row has [Node, Edge, Node]
-	// But wait, our internal Query might return a specific structure for Node/Edge depending on how redigo parses.
-	// Redigo generic parsing of GRAPH.QUERY response is complex.
-	// The response format for a NODE in standard RedisGraph protocol (which redigo parses) is:
-	// [ID (int), Labels (array of strings), Properties (array of [key, value])]
-	// 
-	// However, my falkordb_internal.go Query implementation uses `redis.Values`.
-	// Let's refine `falkordb_internal.go` or `falkordb.go` parsing logic.
-	// 
-	// It is safer to assume I need to handle the parsing here or inside the internal helper.
-	// Let's assume the helper returns generic interface{} and we inspect it.
-	
 	for _, row := range qr.Results {
 		if len(row) < 3 {
 			continue
 		}
-		
+
 		nObj := row[0]
 		rObj := row[1]
 		mObj := row[2]
-		
+
 		entN := parseNode(nObj)
 		if entN != nil && !seenEntities[entN.ID] {
 			result.Entities = append(result.Entities, entN)
@@ -166,7 +149,7 @@ func (f *FalkorDBGraph) Query(ctx context.Context, query *rag.GraphQuery) (*rag.
 			result.Entities = append(result.Entities, entM)
 			seenEntities[entM.ID] = true
 		}
-		
+
 		if entN != nil && entM != nil {
 			rel := parseEdge(rObj, entN.ID, entM.ID)
 			if rel != nil && !seenRels[rel.ID] {
@@ -181,20 +164,22 @@ func (f *FalkorDBGraph) Query(ctx context.Context, query *rag.GraphQuery) (*rag.
 
 // GetEntity retrieves an entity by ID
 func (f *FalkorDBGraph) GetEntity(ctx context.Context, id string) (*rag.Entity, error) {
+	g := NewGraph(f.graphName, f.client)
+
 	query := fmt.Sprintf("MATCH (n {id: '%s'}) RETURN n", id)
-	qr, err := f.graph.Query(query)
+	qr, err := g.Query(ctx, query)
 	if err != nil {
 		return nil, err
 	}
 	if len(qr.Results) == 0 {
 		return nil, fmt.Errorf("entity not found: %s", id)
 	}
-	
+
 	row := qr.Results[0]
 	if len(row) == 0 {
 		return nil, fmt.Errorf("invalid result")
 	}
-	
+
 	ent := parseNode(row[0])
 	if ent == nil {
 		return nil, fmt.Errorf("failed to parse entity")
@@ -204,8 +189,10 @@ func (f *FalkorDBGraph) GetEntity(ctx context.Context, id string) (*rag.Entity, 
 
 // GetRelationship retrieves a relationship by ID
 func (f *FalkorDBGraph) GetRelationship(ctx context.Context, id string) (*rag.Relationship, error) {
+	g := NewGraph(f.graphName, f.client)
+
 	query := fmt.Sprintf("MATCH (a)-[r {id: '%s'}]->(b) RETURN a, r, b", id)
-	qr, err := f.graph.Query(query)
+	qr, err := g.Query(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -221,53 +208,61 @@ func (f *FalkorDBGraph) GetRelationship(ctx context.Context, id string) (*rag.Re
 	a := parseNode(row[0])
 	b := parseNode(row[2])
 	rel := parseEdge(row[1], a.ID, b.ID)
-	
+
 	return rel, nil
 }
 
 // GetRelatedEntities finds entities related to a given entity
 func (f *FalkorDBGraph) GetRelatedEntities(ctx context.Context, entityID string, maxDepth int) ([]*rag.Entity, error) {
-    if maxDepth < 1 {
-        maxDepth = 1
-    }
-    
-    query := fmt.Sprintf("MATCH (n {id: '%s'})-[*1..%d]-(m) RETURN DISTINCT m", entityID, maxDepth)
-    qr, err := f.graph.Query(query)
-    if err != nil {
-        return nil, err
-    }
+	if maxDepth < 1 {
+		maxDepth = 1
+	}
 
-    entities := []*rag.Entity{}
-    seen := make(map[string]bool)
-    
-    for _, row := range qr.Results {
-    	if len(row) == 0 { continue }
-    	ent := parseNode(row[0])
-    	if ent != nil && !seen[ent.ID] {
-    		entities = append(entities, ent)
-    		seen[ent.ID] = true
-    	}
-    }
-    return entities, nil
+	g := NewGraph(f.graphName, f.client)
+
+	query := fmt.Sprintf("MATCH (n {id: '%s'})-[*1..%d]-(m) RETURN DISTINCT m", entityID, maxDepth)
+	qr, err := g.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+
+	entities := []*rag.Entity{}
+	seen := make(map[string]bool)
+
+	for _, row := range qr.Results {
+		if len(row) == 0 {
+			continue
+		}
+		ent := parseNode(row[0])
+		if ent != nil && !seen[ent.ID] {
+			entities = append(entities, ent)
+			seen[ent.ID] = true
+		}
+	}
+	return entities, nil
 }
 
 // DeleteEntity removes an entity
 func (f *FalkorDBGraph) DeleteEntity(ctx context.Context, id string) error {
+	g := NewGraph(f.graphName, f.client)
+
 	query := fmt.Sprintf("MATCH (n {id: '%s'}) DETACH DELETE n", id)
-	_, err := f.graph.Query(query)
+	_, err := g.Query(ctx, query)
 	return err
 }
 
 // DeleteRelationship removes a relationship
 func (f *FalkorDBGraph) DeleteRelationship(ctx context.Context, id string) error {
+	g := NewGraph(f.graphName, f.client)
+
 	query := fmt.Sprintf("MATCH ()-[r {id: '%s'}]->() DELETE r", id)
-	_, err := f.graph.Query(query)
+	_, err := g.Query(ctx, query)
 	return err
 }
 
 // UpdateEntity updates an entity
 func (f *FalkorDBGraph) UpdateEntity(ctx context.Context, entity *rag.Entity) error {
-    return f.AddEntity(ctx, entity)
+	return f.AddEntity(ctx, entity)
 }
 
 // UpdateRelationship updates a relationship
@@ -277,9 +272,9 @@ func (f *FalkorDBGraph) UpdateRelationship(ctx context.Context, rel *rag.Relatio
 
 // Close closes the driver
 func (f *FalkorDBGraph) Close() error {
-    if f.graph != nil && f.graph.Conn != nil {
-        return f.graph.Conn.Close()
-    }
+	if f.client != nil {
+		return f.client.Close()
+	}
 	return nil
 }
 
@@ -316,28 +311,28 @@ func propsToString(m map[string]interface{}) string {
 }
 
 func entityToMap(e *rag.Entity) map[string]interface{} {
-    m := make(map[string]interface{})
-    for k, v := range e.Properties {
-        m[k] = v
-    }
-    m["name"] = e.Name
-    m["type"] = e.Type
-    
-    if len(e.Embedding) > 0 {
-    	m["embedding"] = e.Embedding
-    }
-    return m
+	m := make(map[string]interface{})
+	for k, v := range e.Properties {
+		m[k] = v
+	}
+	m["name"] = e.Name
+	m["type"] = e.Type
+
+	if len(e.Embedding) > 0 {
+		m["embedding"] = e.Embedding
+	}
+	return m
 }
 
 func relationshipToMap(r *rag.Relationship) map[string]interface{} {
-    m := make(map[string]interface{})
-    for k, v := range r.Properties {
-        m[k] = v
-    }
-    m["weight"] = r.Weight
-    m["confidence"] = r.Confidence
-    m["type"] = r.Type
-    return m
+	m := make(map[string]interface{})
+	for k, v := range r.Properties {
+		m[k] = v
+	}
+	m["weight"] = r.Weight
+	m["confidence"] = r.Confidence
+	m["type"] = r.Type
+	return m
 }
 
 // Parsing Helpers for Redigo Graph Response
@@ -354,20 +349,20 @@ func parseNode(obj interface{}) *rag.Entity {
 	// Index 0: ID (internal graph id, not our string ID) - usually int64
 	// Index 1: Labels - []interface{} of strings
 	// Index 2: Properties - []interface{} of [key, value] pairs (Redigo default?) or just flat?
-	// RedisGraph protocol: 
+	// RedisGraph protocol:
 	// Node: [id, [label1, label2], [[key1, type1, val1], ...]] -> No, this depends on compact mode.
 	// I used "GRAPH.QUERY ... --compact".
 	// In --compact mode (which redigo-redisgraph often expects? No, I added it manually).
 	// If I REMOVE --compact, the response is text based for results?
 	// No, default is header/results/stats.
 	// But the result rows contain objects.
-	
+
 	// Let's assume standard object structure returned by redis.Values
-	
+
 	e := &rag.Entity{
 		Properties: make(map[string]interface{}),
 	}
-	
+
 	// Labels
 	if labels, ok := vals[1].([]interface{}); ok && len(labels) > 0 {
 		if l, ok := labels[0].([]byte); ok {
@@ -376,7 +371,7 @@ func parseNode(obj interface{}) *rag.Entity {
 			e.Type = l
 		}
 	}
-	
+
 	// Properties
 	if props, ok := vals[2].([]interface{}); ok {
 		for i := 0; i < len(props); i++ {
@@ -388,13 +383,13 @@ func parseNode(obj interface{}) *rag.Entity {
 				} else if k, ok := propPair[0].(string); ok {
 					key = k
 				}
-				
+
 				val := propPair[1]
 				// Convert val from []byte if needed
 				if b, ok := val.([]byte); ok {
 					val = string(b)
 				}
-				
+
 				switch key {
 				case "id":
 					e.ID = fmt.Sprint(val)
@@ -406,7 +401,7 @@ func parseNode(obj interface{}) *rag.Entity {
 			}
 		}
 	}
-	
+
 	return e
 }
 
@@ -415,23 +410,23 @@ func parseEdge(obj interface{}, sourceID, targetID string) *rag.Relationship {
 	if !ok || len(vals) < 3 {
 		return nil
 	}
-	
+
 	// Edge: [id, type, src, dst, props] -> Structure varies.
 	// Standard: [id, type, srcID, dstID, properties]
-	
+
 	rel := &rag.Relationship{
-		Source: sourceID,
-		Target: targetID,
+		Source:     sourceID,
+		Target:     targetID,
 		Properties: make(map[string]interface{}),
 	}
-	
+
 	// Type (Index 1)
 	if t, ok := vals[1].([]byte); ok {
 		rel.Type = string(t)
 	} else if t, ok := vals[1].(string); ok {
 		rel.Type = t
 	}
-	
+
 	// Properties (Index 4 usually, but check len)
 	if len(vals) > 4 {
 		if props, ok := vals[4].([]interface{}); ok {
@@ -443,12 +438,12 @@ func parseEdge(obj interface{}, sourceID, targetID string) *rag.Relationship {
 					} else if k, ok := propPair[0].(string); ok {
 						key = k
 					}
-					
+
 					val := propPair[1]
 					if b, ok := val.([]byte); ok {
 						val = string(b)
 					}
-					
+
 					switch key {
 					case "id":
 						rel.ID = fmt.Sprint(val)
@@ -462,6 +457,6 @@ func parseEdge(obj interface{}, sourceID, targetID string) *rag.Relationship {
 			}
 		}
 	}
-	
+
 	return rel
 }

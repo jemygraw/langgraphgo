@@ -70,7 +70,7 @@ func (r *VectorRetriever) RetrieveWithConfig(ctx context.Context, query string, 
 	// Perform vector search
 	var results []rag.DocumentSearchResult
 
-	if config.Filter != nil && len(config.Filter) > 0 {
+	if len(config.Filter) > 0 {
 		// Search with filters
 		results, err = r.vectorStore.SearchWithFilter(ctx, queryEmbedding, config.K, config.Filter)
 	} else {
@@ -367,7 +367,7 @@ func (r *VectorStoreRetriever) RetrieveWithConfig(ctx context.Context, query str
 	// Perform search
 	var results []rag.DocumentSearchResult
 
-	if config.Filter != nil && len(config.Filter) > 0 {
+	if len(config.Filter) > 0 {
 		results, err = r.vectorStore.SearchWithFilter(ctx, queryEmbedding, config.K, config.Filter)
 	} else {
 		results, err = r.vectorStore.Search(ctx, queryEmbedding, config.K)
@@ -390,4 +390,3 @@ func (r *VectorStoreRetriever) RetrieveWithConfig(ctx context.Context, query str
 
 	return results, nil
 }
-

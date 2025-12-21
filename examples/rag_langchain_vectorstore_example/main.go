@@ -236,7 +236,7 @@ The library provides prebuilt components like:
 	fmt.Println(strings.Repeat("-", 80))
 
 	query := "checkpointing and persistence"
-	
+
 	// Use retriever to search with scores
 	results, err := retriever.RetrieveWithConfig(ctx, query, &rag.RetrievalConfig{K: 5, IncludeScores: true})
 	if err != nil {

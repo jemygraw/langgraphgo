@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/smallnest/langgraphgo/rag"
 )
@@ -237,11 +238,6 @@ func (g *GraphRAGEngine) extractEntities(ctx context.Context, text string) ([]*r
 			UpdatedAt:  time.Now(),
 		}
 
-		// Add embedding if embedder is available
-		if g.embedder != nil {
-			// Embedding generation removed since store.Entity doesn't store embeddings
-		}
-
 		entities[i] = entity
 	}
 
@@ -450,7 +446,7 @@ func (g *GraphRAGEngine) manualEntityExtraction(ctx context.Context, text string
 	// Look for capitalized words (potential entities)
 	words := strings.Fields(text)
 	for _, word := range words {
-		if strings.Title(word) == word && len(word) > 2 {
+		if len(word) > 2 && unicode.IsUpper(rune(word[0])) {
 			entity := &rag.Entity{
 				ID:   word,
 				Type: "UNKNOWN",
@@ -480,12 +476,12 @@ func (g *GraphRAGEngine) manualRelationshipExtraction(ctx context.Context, text 
 				continue
 			}
 			relationship := &rag.Relationship{
-				ID:           fmt.Sprintf("%s_related_to_%s", entity1.ID, entity2.ID),
-				Source:       entity1.ID,
-				Target:       entity2.ID,
-				Type:         "RELATED_TO",
-				Properties:   map[string]any{},
-				CreatedAt:    time.Now(),
+				ID:         fmt.Sprintf("%s_related_to_%s", entity1.ID, entity2.ID),
+				Source:     entity1.ID,
+				Target:     entity2.ID,
+				Type:       "RELATED_TO",
+				Properties: map[string]any{},
+				CreatedAt:  time.Now(),
 			}
 			relationships = append(relationships, relationship)
 		}

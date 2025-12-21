@@ -301,6 +301,20 @@ func WithCharacterSeparator(separator string) CharacterTextSplitterOption {
 	}
 }
 
+// WithCharacterChunkSize sets the chunk size for character splitter
+func WithCharacterChunkSize(size int) CharacterTextSplitterOption {
+	return func(s *CharacterTextSplitter) {
+		s.chunkSize = size
+	}
+}
+
+// WithCharacterChunkOverlap sets the chunk overlap for character splitter
+func WithCharacterChunkOverlap(overlap int) CharacterTextSplitterOption {
+	return func(s *CharacterTextSplitter) {
+		s.chunkOverlap = overlap
+	}
+}
+
 // NewCharacterTextSplitter creates a new CharacterTextSplitter
 func NewCharacterTextSplitter(opts ...CharacterTextSplitterOption) rag.TextSplitter {
 	s := &CharacterTextSplitter{

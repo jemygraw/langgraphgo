@@ -46,7 +46,7 @@ func main() {
 		}
 		if !info.IsDir() && filepath.Ext(path) == ".txt" {
 			fmt.Printf("Processing %s...\n", path)
-			
+
 			// Load
 			l := loader.NewTextLoader(path)
 			docs, err := l.Load(ctx)
@@ -113,7 +113,7 @@ func main() {
 
 	finalState := result.(rag.RAGState)
 	fmt.Printf("\nAnswer:\n%s\n", finalState.Answer)
-	
+
 	if len(finalState.Citations) > 0 {
 		fmt.Println("\nCitations:")
 		for _, citation := range finalState.Citations {
