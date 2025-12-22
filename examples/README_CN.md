@@ -42,6 +42,8 @@
 - **[Reflection Agent](reflection_agent/README_CN.md)**: 迭代改进代理，通过自我反思不断优化响应质量。
 - **[Tree of Thoughts](tree_of_thoughts/README_CN.md)**: 基于搜索的推理代理，通过树结构探索多个解决方案路径。
 - **[Mental Loop](mental_loop/README_CN.md)**: 模拟器循环代理 (Simulator-in-the-Loop)，在真实执行前在沙箱中测试行动方案（三思而后行）。
+- **[Reflexive Metacognitive Agent (English)](reflexive_metacognitive/README.md)**: 具备自我意识的代理，维护显式的能力和局限性自我模型，在回答前进行元认知分析（知道自己不知道什么）。
+- **[Reflexive Metacognitive Agent (中文版)](reflexive_metacognitive_cn/README_CN.md)**: 反思元认知代理中文版，完全中文化的提示词、日志和响应。
 - **[Supervisor](supervisor/README_CN.md)**: 使用 Supervisor 进行多代理编排。
 - **[Swarm](swarm/README_CN.md)**: 使用切换 (handoffs) 的多代理协作.
 - **[Chat Agent](chat_agent/README_CN.md)**: 支持自动会话管理的多轮对话代理。
@@ -70,6 +72,12 @@
 - **[RAG with LangChain](rag_with_langchain/README_CN.md)**: 使用 LangChain 组件的 RAG。
 - **[RAG with VectorStores](rag_langchain_vectorstore_example/README_CN.md)**: 使用 LangChain VectorStores 的 RAG。
 - **[RAG with Chroma](rag_chroma_example/README_CN.md)**: 使用 Chroma 数据库的 RAG。
+- **[RAG Query Rewrite](rag_query_rewrite/README_CN.md)**: 支持查询重写的 RAG 以提高检索效果。
+- **[RAG with FalkorDB Graph](rag_falkordb_graph/README_CN.md)**: 使用 FalkorDB 知识图谱的 RAG，支持自动实体提取。
+- **[RAG with FalkorDB Simple](rag_falkordb_simple/README_CN.md)**: 使用 FalkorDB 的简单 RAG，手动创建实体/关系。
+- **[RAG with FalkorDB Fast](rag_falkordb_fast/README_CN.md)**: FalkorDB 快速查询优化版 RAG。
+- **[RAG with FalkorDB Debug](rag_falkordb_debug/README_CN.md)**: FalkorDB RAG 调试版本，包含详细日志。
+- **[RAG with FalkorDB Debug Query](rag_falkordb_debug_query/README_CN.md)**: FalkorDB RAG 查询调试。
 
 ## 其他
 - **[可视化 (Visualization)](visualization/README_CN.md)**: 生成图的 Mermaid 图表。

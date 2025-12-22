@@ -1,10 +1,38 @@
+// Mental Loop Trading Agent
+//
+// This example implements the "Mental Loop" (Simulator-in-the-Loop) architecture
+// from the Agentic Architectures series by Fareed Khan.
+//
+// Architecture Overview:
+//
+// 1. OBSERVE: The agent observes the current state of the environment
+// 2. PROPOSE: Based on goals and current state, propose a high-level action/strategy
+// 3. SIMULATE: Fork the environment state and run the proposed action forward
+//    to observe potential outcomes in a sandboxed simulation
+// 4. ASSESS & REFINE: Analyze simulation results to evaluate risks and rewards,
+//    refining the initial proposal into a final, concrete action
+// 5. EXECUTE: Execute the final, refined action in the real environment
+// 6. REPEAT: Begin again from the new state
+//
+// This "think before you act" approach allows agents to:
+// - Perform what-if analysis
+// - Anticipate consequences
+// - Refine plans for safety and effectiveness
+//
+// Use cases: Robotics (simulating movements), High-stakes decisions (finance,
+// healthcare), Complex game AI, and any domain where mistakes have real consequences.
+//
+// Reference: https://github.com/FareedKhan-dev/all-agentic-architectures/blob/main/10_mental_loop.ipynb
+
 package main
 
 import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
+	"os"
 	"strings"
 	"time"
 
@@ -13,130 +41,153 @@ import (
 	"github.com/tmc/langchaingo/llms/openai"
 )
 
-// MarketState represents the state of the stock market
-type MarketState struct {
+// ==================== Data Models ====================
+
+// Portfolio represents the agent's trading portfolio
+type Portfolio struct {
+	Cash   float64
+	Shares int
+}
+
+// Value returns the total portfolio value at the current price
+func (p *Portfolio) Value(currentPrice float64) float64 {
+	return p.Cash + float64(p.Shares)*currentPrice
+}
+
+// MarketSimulator simulates a stock market environment
+// This serves as both the "real world" and the sandbox for simulations
+type MarketSimulator struct {
+	Day        int
 	Price      float64
-	Trend      string // "bullish", "bearish", "neutral"
-	NewsEvent  string
-	DayNumber  int
-	AvgVolume  int
-	Volatility float64
-	Shares     int
-	Cash       float64
+	Volatility float64 // Standard deviation for price changes
+	Drift      float64 // General trend (daily return)
+	MarketNews string
+	Portfolio  Portfolio
 }
 
-// NewMarketState creates a new market state
-func NewMarketState(price float64, trend, news string, day int) *MarketState {
-	return &MarketState{
-		Price:      price,
-		Trend:      trend,
-		NewsEvent:  news,
-		DayNumber:  day,
-		AvgVolume:  1000000,
-		Volatility: 0.02,
-		Shares:     0,
-		Cash:       10000.0,
-	}
+// ProposedAction represents the high-level strategy proposed by the analyst
+type ProposedAction struct {
+	Strategy  string // e.g., "buy aggressively", "sell cautiously", "hold"
+	Reasoning string
 }
 
-// Copy creates a deep copy of the market state (for simulation)
-func (m *MarketState) Copy() *MarketState {
-	return &MarketState{
-		Price:      m.Price,
-		Trend:      m.Trend,
-		NewsEvent:  m.NewsEvent,
-		DayNumber:  m.DayNumber,
-		AvgVolume:  m.AvgVolume,
-		Volatility: m.Volatility,
-		Shares:     m.Shares,
-		Cash:       m.Cash,
-	}
+// FinalDecision represents the final, concrete action to be executed
+type FinalDecision struct {
+	Action    string // "buy", "sell", or "hold"
+	Amount    float64
+	Reasoning string
 }
 
-// Step simulates one day of market activity
-func (m *MarketState) Step(action string, amount int) {
-	// Execute the action
-	switch action {
-	case "buy":
-		cost := float64(amount) * m.Price
-		if cost <= m.Cash {
-			m.Shares += amount
-			m.Cash -= cost
-		}
-	case "sell":
-		if amount <= m.Shares {
-			m.Shares -= amount
-			m.Cash += float64(amount) * m.Price
-		}
-	case "hold":
-		// Do nothing
-	}
-
-	// Simulate market movement
-	priceChange := 0.0
-	switch m.Trend {
-	case "bullish":
-		priceChange = m.Price * (0.01 + rand.Float64()*m.Volatility)
-	case "bearish":
-		priceChange = -m.Price * (0.01 + rand.Float64()*m.Volatility)
-	case "neutral":
-		priceChange = m.Price * (rand.Float64()*m.Volatility*2 - m.Volatility)
-	}
-
-	m.Price += priceChange
-	m.DayNumber++
-}
-
-// GetStateString returns a human-readable description
-func (m *MarketState) GetStateString() string {
-	portfolioValue := m.Cash + float64(m.Shares)*m.Price
-	return fmt.Sprintf(
-		"Day %d | Price: $%.2f | Trend: %s | News: %s | Shares: %d | Cash: $%.2f | Portfolio: $%.2f",
-		m.DayNumber, m.Price, m.Trend, m.NewsEvent, m.Shares, m.Cash, portfolioValue,
-	)
-}
-
-// AgentState represents the state of the trading agent
-type AgentState struct {
-	RealMarket        *MarketState
-	ProposedAction    string
-	ProposedAmount    int
-	SimulationResults []SimulationResult
-	FinalDecision     string
-	FinalAmount       int
-	Reasoning         string
-}
-
-// SimulationResult stores the outcome of one simulation
+// SimulationResult stores the outcome of one simulation run
 type SimulationResult struct {
-	Action     string
-	Amount     int
-	FinalPrice float64
-	FinalValue float64
-	ProfitLoss float64
+	SimNum      int
+	InitialValue float64
+	FinalValue   float64
+	ReturnPct    float64
 }
 
-// AnalystNode observes the market and proposes a trading strategy
-func AnalystNode(ctx context.Context, state any) (any, error) {
+// ==================== Agent State ====================
+
+// AgentState represents the state passed between nodes in the graph
+type AgentState struct {
+	RealMarket        *MarketSimulator
+	ProposedAction    *ProposedAction
+	SimulationResults []SimulationResult
+	FinalDecision     *FinalDecision
+}
+
+// ==================== Market Simulator Methods ====================
+
+// Step advances the simulation by one day, executing a trade first
+func (m *MarketSimulator) Step(action string, amount float64) {
+	// 1. Execute trade
+	switch action {
+	case "buy": // amount is number of shares
+		sharesToBuy := int(amount)
+		cost := float64(sharesToBuy) * m.Price
+		if m.Portfolio.Cash >= cost {
+			m.Portfolio.Shares += sharesToBuy
+			m.Portfolio.Cash -= cost
+		}
+	case "sell": // amount is number of shares
+		sharesToSell := int(amount)
+		if m.Portfolio.Shares >= sharesToSell {
+			m.Portfolio.Shares -= sharesToSell
+			m.Portfolio.Cash += float64(sharesToSell) * m.Price
+		}
+	}
+
+	// 2. Update market price using Geometric Brownian Motion
+	// daily_return = normal(drift, volatility)
+	dailyReturn := rand.NormFloat64()*m.Volatility + m.Drift
+	m.Price *= (1 + dailyReturn)
+
+	// 3. Advance time
+	m.Day++
+
+	// 4. Potentially update news
+	if rand.Float64() < 0.1 { // 10% chance of new news
+		newsOptions := []string{
+			"Positive earnings report expected.",
+			"New competitor enters the market.",
+			"Macroeconomic outlook is strong.",
+			"Regulatory concerns are growing.",
+		}
+		m.MarketNews = newsOptions[rand.Intn(len(newsOptions))]
+
+		// News affects drift
+		if strings.Contains(m.MarketNews, "Positive") || strings.Contains(m.MarketNews, "strong") {
+			m.Drift = 0.05
+		} else {
+			m.Drift = -0.05
+		}
+	} else {
+		m.Drift = 0.01 // Revert to normal drift
+	}
+}
+
+// GetStateString returns a human-readable description of the market state
+func (m *MarketSimulator) GetStateString() string {
+	return fmt.Sprintf("Day %d: Price=$%.2f, News: %s\nPortfolio: $%.2f (%d shares, $%.2f cash)",
+		m.Day, m.Price, m.MarketNews,
+		m.Portfolio.Value(m.Price), m.Portfolio.Shares, m.Portfolio.Cash)
+}
+
+// Copy creates a deep copy for simulation (sandboxing)
+func (m *MarketSimulator) Copy() *MarketSimulator {
+	return &MarketSimulator{
+		Day:        m.Day,
+		Price:      m.Price,
+		Volatility: m.Volatility,
+		Drift:      m.Drift,
+		MarketNews: m.MarketNews,
+		Portfolio: Portfolio{
+			Cash:   m.Portfolio.Cash,
+			Shares: m.Portfolio.Shares,
+		},
+	}
+}
+
+// ==================== Graph Nodes ====================
+
+// ProposeActionNode observes the market and proposes a high-level strategy
+// This is the "OBSERVE -> PROPOSE" step of the mental loop
+func ProposeActionNode(ctx context.Context, state any) (any, error) {
 	stateMap := state.(map[string]any)
 	agentState := stateMap["agent_state"].(*AgentState)
-	market := agentState.RealMarket
+
+	fmt.Println("\n--- 🧐 Analyst Proposing Action ---")
 
 	// Create prompt for the analyst
-	prompt := fmt.Sprintf(`You are a stock market analyst. Based on the current market conditions, propose a trading strategy.
+	prompt := fmt.Sprintf(`You are a sharp financial analyst. Based on the current market state, propose a trading strategy.
 
-Current Market State:
+Market State:
 %s
 
-You must respond in EXACTLY this format:
-ACTION: buy
-AMOUNT: 25
-REASONING: Your detailed analysis here explaining why you recommend this action.
-
-Valid actions are: buy, sell, or hold
-Amount should be between 0 and 50 shares
-Provide a clear reasoning based on the market trend and news.`,
-		market.GetStateString())
+Respond in the following format (keep reasoning concise):
+STRATEGY: [buy aggressively|buy cautiously|sell aggressively|sell cautiously|hold]
+REASONING: [brief reasoning for the proposed strategy]`,
+		agentState.RealMarket.GetStateString())
 
 	// Call LLM
 	llm := stateMap["llm"].(llms.Model)
@@ -146,121 +197,144 @@ Provide a clear reasoning based on the market trend and news.`,
 	}
 
 	// Parse the response
-	action, amount, reasoning := parseAnalystResponse(resp)
+	proposal := parseProposedAction(resp)
+	agentState.ProposedAction = proposal
 
-	agentState.ProposedAction = action
-	agentState.ProposedAmount = amount
-	agentState.Reasoning = reasoning
-
-	fmt.Println("\n📊 ANALYST PROPOSAL:")
-	fmt.Printf("Action: %s %d shares\n", action, amount)
-	fmt.Printf("Reasoning: %s\n", reasoning)
+	fmt.Printf("[yellow]Proposal:[yellow] %s. [italic]Reason: %s[/italic]\n",
+		proposal.Strategy, proposal.Reasoning)
 
 	return stateMap, nil
 }
 
-// SimulatorNode runs multiple simulations to test the proposed strategy
-func SimulatorNode(ctx context.Context, state any) (any, error) {
+// RunSimulationNode runs the proposed strategy in a sandboxed simulation
+// This is the "SIMULATE" step of the mental loop
+func RunSimulationNode(ctx context.Context, state any) (any, error) {
 	stateMap := state.(map[string]any)
 	agentState := stateMap["agent_state"].(*AgentState)
+
+	fmt.Println("\n--- 🤖 Running Simulations ---")
+
+	strategy := agentState.ProposedAction.Strategy
 	numSimulations := 5
-	horizon := 10 // Simulate 10 days ahead
-
-	fmt.Println("\n🔬 RUNNING SIMULATIONS:")
-
-	var results []SimulationResult
+	simulationHorizon := 10 // days
+	results := make([]SimulationResult, numSimulations)
 
 	for i := 0; i < numSimulations; i++ {
-		// Create a copy of the market for simulation
-		simMarket := agentState.RealMarket.Copy()
-		initialValue := simMarket.Cash + float64(simMarket.Shares)*simMarket.Price
+		// IMPORTANT: Create a deep copy to not affect the real market state
+		simulatedMarket := agentState.RealMarket.Copy()
+		initialValue := simulatedMarket.Portfolio.Value(simulatedMarket.Price)
 
-		// Execute proposed action
-		simMarket.Step(agentState.ProposedAction, agentState.ProposedAmount)
+		// Translate strategy to a concrete action for the simulation
+		var action string
+		var amount float64
 
-		// Run forward for the horizon
-		for day := 0; day < horizon; day++ {
-			simMarket.Step("hold", 0)
+		if strings.Contains(strategy, "buy") {
+			action = "buy"
+			// Aggressively = 25% of cash, Cautiously = 10%
+			cashRatio := 0.25
+			if strings.Contains(strategy, "cautiously") {
+				cashRatio = 0.1
+			}
+			amount = math.Floor((simulatedMarket.Portfolio.Cash * cashRatio) / simulatedMarket.Price)
+		} else if strings.Contains(strategy, "sell") {
+			action = "sell"
+			// Aggressively = 25% of shares, Cautiously = 10%
+			sharesRatio := 0.25
+			if strings.Contains(strategy, "cautiously") {
+				sharesRatio = 0.1
+			}
+			amount = math.Floor(float64(simulatedMarket.Portfolio.Shares) * sharesRatio)
+		} else {
+			action = "hold"
+			amount = 0
 		}
 
-		// Calculate final value
-		finalValue := simMarket.Cash + float64(simMarket.Shares)*simMarket.Price
-		profitLoss := finalValue - initialValue
-
-		result := SimulationResult{
-			Action:     agentState.ProposedAction,
-			Amount:     agentState.ProposedAmount,
-			FinalPrice: simMarket.Price,
-			FinalValue: finalValue,
-			ProfitLoss: profitLoss,
+		// Run the simulation forward
+		simulatedMarket.Step(action, amount)
+		for j := 0; j < simulationHorizon-1; j++ {
+			simulatedMarket.Step("hold", 0) // Just hold after the initial action
 		}
 
-		results = append(results, result)
+		finalValue := simulatedMarket.Portfolio.Value(simulatedMarket.Price)
+		returnPct := (finalValue - initialValue) / initialValue * 100
 
-		fmt.Printf("  Sim %d: Final Value: $%.2f (P/L: $%.2f)\n",
-			i+1, finalValue, profitLoss)
+		results[i] = SimulationResult{
+			SimNum:       i + 1,
+			InitialValue: initialValue,
+			FinalValue:   finalValue,
+			ReturnPct:    returnPct,
+		}
 	}
 
 	agentState.SimulationResults = results
+	fmt.Println("[cyan]Simulation complete. Results will be passed to the risk manager.[cyan]")
 
 	return stateMap, nil
 }
 
-// RiskManagerNode analyzes simulations and makes the final decision
-func RiskManagerNode(ctx context.Context, state any) (any, error) {
+// RefineAndDecideNode analyzes simulation results and makes a final decision
+// This is the "ASSESS & REFINE" step of the mental loop
+func RefineAndDecideNode(ctx context.Context, state any) (any, error) {
 	stateMap := state.(map[string]any)
 	agentState := stateMap["agent_state"].(*AgentState)
 
-	// Calculate simulation statistics
-	var totalPL, minPL, maxPL float64
-	minPL = 1e9
-	maxPL = -1e9
+	fmt.Println("\n--- 🧠 Risk Manager Refining Decision ---")
 
-	for _, result := range agentState.SimulationResults {
-		totalPL += result.ProfitLoss
-		if result.ProfitLoss < minPL {
-			minPL = result.ProfitLoss
-		}
-		if result.ProfitLoss > maxPL {
-			maxPL = result.ProfitLoss
-		}
+	// Format simulation results
+	var resultsSummary strings.Builder
+	for _, r := range agentState.SimulationResults {
+		resultsSummary.WriteString(fmt.Sprintf("Sim %d: Initial=$%.2f, Final=$%.2f, Return=%.2f%%\n",
+			r.SimNum, r.InitialValue, r.FinalValue, r.ReturnPct))
 	}
 
-	avgPL := totalPL / float64(len(agentState.SimulationResults))
+	// Calculate statistics
+	var avgReturn, minReturn, maxReturn, positiveCount float64
+	minReturn = math.Inf(1)
+	maxReturn = math.Inf(-1)
+	for _, r := range agentState.SimulationResults {
+		avgReturn += r.ReturnPct
+		if r.ReturnPct < minReturn {
+			minReturn = r.ReturnPct
+		}
+		if r.ReturnPct > maxReturn {
+			maxReturn = r.ReturnPct
+		}
+		if r.ReturnPct > 0 {
+			positiveCount++
+		}
+	}
+	avgReturn /= float64(len(agentState.SimulationResults))
 
-	// Create prompt for risk manager
-	prompt := fmt.Sprintf(`You are a risk manager evaluating a trading decision.
+	// Create prompt for the risk manager
+	prompt := fmt.Sprintf(`You are a cautious risk manager. Your analyst proposed a strategy. You have run simulations to test it.
 
-Original Proposal: %s %d shares
-Analyst Reasoning: %s
+Based on the potential outcomes, make a final, concrete decision.
 
-Simulation Results (%d scenarios, 10-day horizon):
-- Average P/L: $%.2f
-- Best Case: $%.2f
-- Worst Case: $%.2f
+If results are highly variable or negative, reduce risk (e.g., buy/sell fewer shares, or hold).
 
-Current Market: %s
+Initial Proposal: %s
 
-Based on the simulation results, make your final decision. You can:
-1. Approve the proposal as-is
-2. Reduce the position size to manage risk (e.g., from 50 to 20 shares)
-3. Reject and hold instead if risk is too high
+Simulation Results:
+%s
 
-You must respond in EXACTLY this format:
-DECISION: buy
-AMOUNT: 20
-REASONING: Based on simulations showing positive expected value (avg $XXX), I approve the trade but reduce size to 20 shares to manage downside risk.
+Real Market State:
+%s
 
-Valid decisions are: buy, sell, or hold
-Amount should reflect your risk-adjusted position size.`,
-		agentState.ProposedAction,
-		agentState.ProposedAmount,
-		agentState.Reasoning,
-		len(agentState.SimulationResults),
-		avgPL,
-		maxPL,
-		minPL,
-		agentState.RealMarket.GetStateString())
+Simulation Statistics:
+- Average Return: %.2f%%
+- Best Case: %.2f%%
+- Worst Case: %.2f%%
+- Positive Outcomes: %d/%d
+
+Respond in the following format:
+DECISION: [buy|sell|hold]
+AMOUNT: [number of shares, 0 if holding]
+REASONING: [final reasoning, referencing simulation results]`,
+		agentState.ProposedAction.Strategy,
+		resultsSummary.String(),
+		agentState.RealMarket.GetStateString(),
+		avgReturn, maxReturn, minReturn,
+		int(positiveCount), len(agentState.SimulationResults))
 
 	// Call LLM
 	llm := stateMap["llm"].(llms.Model)
@@ -269,50 +343,41 @@ Amount should reflect your risk-adjusted position size.`,
 		return nil, fmt.Errorf("risk manager LLM call failed: %w", err)
 	}
 
-	// Debug: print raw response
-	if false { // Set to true for debugging
-		fmt.Printf("\n[DEBUG] Risk Manager Raw Response:\n%s\n", resp)
-	}
-
 	// Parse the response
-	action, amount, reasoning := parseAnalystResponse(resp)
+	decision := parseFinalDecision(resp)
+	agentState.FinalDecision = decision
 
-	agentState.FinalDecision = action
-	agentState.FinalAmount = amount
-
-	fmt.Println("\n⚖️  RISK MANAGER DECISION:")
-	fmt.Printf("Decision: %s %d shares\n", action, amount)
-	fmt.Printf("Reasoning: %s\n", reasoning)
-	fmt.Printf("\nSimulation Stats - Avg P/L: $%.2f, Range: [$%.2f, $%.2f]\n",
-		avgPL, minPL, maxPL)
+	fmt.Printf("[green]Final Decision:[green] %s %.0f shares. [italic]Reason: %s[/italic]\n",
+		decision.Action, decision.Amount, decision.Reasoning)
 
 	return stateMap, nil
 }
 
-// ExecuteNode executes the final decision in the real market
-func ExecuteNode(ctx context.Context, state any) (any, error) {
+// ExecuteInRealWorldNode executes the final decision in the real market
+// This is the "EXECUTE" step of the mental loop
+func ExecuteInRealWorldNode(ctx context.Context, state any) (any, error) {
 	stateMap := state.(map[string]any)
 	agentState := stateMap["agent_state"].(*AgentState)
 
-	fmt.Println("\n💼 EXECUTING IN REAL MARKET:")
-	beforeValue := agentState.RealMarket.Cash + float64(agentState.RealMarket.Shares)*agentState.RealMarket.Price
-	fmt.Printf("Before: %s\n", agentState.RealMarket.GetStateString())
+	fmt.Println("\n--- 🚀 Executing in Real World ---")
 
-	// Execute the decision
-	agentState.RealMarket.Step(agentState.FinalDecision, agentState.FinalAmount)
+	decision := agentState.FinalDecision
+	realMarket := agentState.RealMarket
 
-	afterValue := agentState.RealMarket.Cash + float64(agentState.RealMarket.Shares)*agentState.RealMarket.Price
-	fmt.Printf("After:  %s\n", agentState.RealMarket.GetStateString())
-	fmt.Printf("Immediate Impact: $%.2f\n", afterValue-beforeValue)
+	fmt.Printf("[bold]Before:[bold] %s\n", realMarket.GetStateString())
+	realMarket.Step(decision.Action, decision.Amount)
+	fmt.Printf("[bold]After:[bold] %s\n", realMarket.GetStateString())
 
 	return stateMap, nil
 }
 
-// parseAnalystResponse extracts action, amount, and reasoning from LLM response
-func parseAnalystResponse(response string) (string, int, string) {
-	action := "hold"
-	amount := 0
-	reasoning := ""
+// ==================== Parsing Helpers ====================
+
+func parseProposedAction(response string) *ProposedAction {
+	proposal := &ProposedAction{
+		Strategy:  "hold",
+		Reasoning: response,
+	}
 
 	lines := strings.Split(response, "\n")
 	inReasoning := false
@@ -321,94 +386,113 @@ func parseAnalystResponse(response string) (string, int, string) {
 		line = strings.TrimSpace(line)
 		upperLine := strings.ToUpper(line)
 
-		// Support both ACTION: and DECISION: keywords
-		if strings.HasPrefix(upperLine, "ACTION:") || strings.HasPrefix(upperLine, "DECISION:") {
-			// Extract action
+		if strings.HasPrefix(upperLine, "STRATEGY:") {
 			parts := strings.SplitN(line, ":", 2)
 			if len(parts) > 1 {
-				actionStr := strings.TrimSpace(parts[1])
-				actionStr = strings.ToLower(actionStr)
-				// Handle cases like "buy" or "buy 20 shares"
-				actionWords := strings.Fields(actionStr)
-				if len(actionWords) > 0 {
-					firstWord := actionWords[0]
-					if firstWord == "buy" || firstWord == "sell" || firstWord == "hold" {
-						action = firstWord
-					}
-				}
-			}
-			inReasoning = false
-		} else if strings.HasPrefix(upperLine, "AMOUNT:") {
-			// Extract amount
-			parts := strings.SplitN(line, ":", 2)
-			if len(parts) > 1 {
-				amountStr := strings.TrimSpace(parts[1])
-				// Extract first number from the string
-				var num int
-				fmt.Sscanf(amountStr, "%d", &num)
-				if num >= 0 && num <= 100 {
-					amount = num
-				}
+				proposal.Strategy = strings.TrimSpace(parts[1])
+				// Remove markdown formatting like **STRATEGY:**
+				proposal.Strategy = strings.ReplaceAll(proposal.Strategy, "**", "")
+				proposal.Strategy = strings.ToLower(proposal.Strategy)
 			}
 			inReasoning = false
 		} else if strings.HasPrefix(upperLine, "REASONING:") {
-			// Start collecting reasoning
 			parts := strings.SplitN(line, ":", 2)
 			if len(parts) > 1 {
-				reasoning = strings.TrimSpace(parts[1])
+				proposal.Reasoning = strings.TrimSpace(parts[1])
+				// Remove markdown formatting
+				proposal.Reasoning = strings.ReplaceAll(proposal.Reasoning, "**", "")
 			}
 			inReasoning = true
 		} else if inReasoning && line != "" {
 			// Continue collecting reasoning
-			reasoning += " " + line
+			if proposal.Reasoning != "" && proposal.Reasoning != response {
+				proposal.Reasoning += " " + line
+			}
 		}
 	}
 
-	// Fallback: if no action found, try to find keywords in the response
-	if action == "hold" && reasoning == "" {
-		lowerResp := strings.ToLower(response)
-		if strings.Contains(lowerResp, "buy") && !strings.Contains(lowerResp, "don't buy") {
-			action = "buy"
-			// Try to extract a number
-			words := strings.Fields(response)
-			for i, word := range words {
-				if strings.ToLower(word) == "buy" && i+1 < len(words) {
-					var num int
-					fmt.Sscanf(words[i+1], "%d", &num)
-					if num > 0 && num <= 100 {
-						amount = num
-						break
+	// If no explicit reasoning field was found, use the whole response
+	// but try to extract just the reasoning part
+	if proposal.Reasoning == response {
+		// Try to find reasoning after STRATEGY line
+		lines := strings.Split(response, "\n")
+		for i, line := range lines {
+			if strings.Contains(strings.ToUpper(line), "STRATEGY:") {
+				if i+1 < len(lines) {
+					reasoningLines := []string{}
+					for j := i + 1; j < len(lines); j++ {
+						nextLine := strings.TrimSpace(lines[j])
+						if nextLine != "" && !strings.HasPrefix(strings.ToUpper(nextLine), "STRATEGY:") {
+							reasoningLines = append(reasoningLines, nextLine)
+						}
+					}
+					if len(reasoningLines) > 0 {
+						proposal.Reasoning = strings.Join(reasoningLines, " ")
 					}
 				}
+				break
 			}
-			if amount == 0 {
-				amount = 10 // Default amount
-			}
-			reasoning = response
-		} else if strings.Contains(lowerResp, "sell") {
-			action = "sell"
-			reasoning = response
 		}
 	}
 
-	// If reasoning is still empty, use the whole response
-	if reasoning == "" {
-		reasoning = response
-	}
-
-	// Trim reasoning to reasonable length
-	if len(reasoning) > 200 {
-		reasoning = reasoning[:200] + "..."
-	}
-
-	return action, amount, reasoning
+	return proposal
 }
 
+func parseFinalDecision(response string) *FinalDecision {
+	decision := &FinalDecision{
+		Action:    "hold",
+		Amount:    0,
+		Reasoning: response,
+	}
+
+	lines := strings.Split(response, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		upperLine := strings.ToUpper(line)
+
+		if strings.HasPrefix(upperLine, "DECISION:") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) > 1 {
+				decision.Action = strings.TrimSpace(parts[1])
+				decision.Action = strings.ToLower(decision.Action)
+				// Extract just the action word
+				words := strings.Fields(decision.Action)
+				if len(words) > 0 {
+					decision.Action = words[0]
+				}
+			}
+		} else if strings.HasPrefix(upperLine, "AMOUNT:") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) > 1 {
+				var amount float64
+				fmt.Sscanf(strings.TrimSpace(parts[1]), "%f", &amount)
+				decision.Amount = amount
+			}
+		} else if strings.HasPrefix(upperLine, "REASONING:") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) > 1 {
+				decision.Reasoning = strings.TrimSpace(parts[1])
+			}
+		}
+	}
+
+	return decision
+}
+
+// ==================== Main Function ====================
+
 func main() {
-	fmt.Println("=== Mental Loop Trading Agent ===")
+	// Check for API key
+	if os.Getenv("OPENAI_API_KEY") == "" {
+		log.Fatal("OPENAI_API_KEY environment variable is required")
+	}
+
+	fmt.Println("=== 📘 Mental Loop (Simulator-in-the-Loop) Architecture ===")
 	fmt.Println()
-	fmt.Println("This demo implements the 'Mental Loop' (Simulator-in-the-Loop) architecture.")
-	fmt.Println("The agent tests proposed actions in a simulated environment before executing.")
+	fmt.Println("This demo implements a trading agent that uses an internal simulator")
+	fmt.Println("to test proposed actions before executing them in the real market.")
+	fmt.Println()
+	fmt.Println("Architecture: OBSERVE -> PROPOSE -> SIMULATE -> REFINE -> EXECUTE")
 	fmt.Println()
 
 	// Initialize random seed
@@ -420,31 +504,23 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Create initial market state
-	market := NewMarketState(100.0, "bullish", "Positive earnings report", 1)
-
-	// Create agent state
-	agentState := &AgentState{
-		RealMarket: market,
-	}
-
 	// Create the mental loop graph
 	workflow := graph.NewStateGraph()
 
 	// Add nodes
-	workflow.AddNode("analyst", "analyst", AnalystNode)
-	workflow.AddNode("simulator", "simulator", SimulatorNode)
-	workflow.AddNode("risk_manager", "risk_manager", RiskManagerNode)
-	workflow.AddNode("execute", "execute", ExecuteNode)
+	workflow.AddNode("propose", "Observe and propose action", ProposeActionNode)
+	workflow.AddNode("simulate", "Run simulations", RunSimulationNode)
+	workflow.AddNode("refine", "Refine decision", RefineAndDecideNode)
+	workflow.AddNode("execute", "Execute in real world", ExecuteInRealWorldNode)
 
-	// Define edges: analyst -> simulator -> risk_manager -> execute
-	workflow.AddEdge("analyst", "simulator")
-	workflow.AddEdge("simulator", "risk_manager")
-	workflow.AddEdge("risk_manager", "execute")
+	// Define edges: propose -> simulate -> refine -> execute
+	workflow.AddEdge("propose", "simulate")
+	workflow.AddEdge("simulate", "refine")
+	workflow.AddEdge("refine", "execute")
 	workflow.AddEdge("execute", graph.END)
 
 	// Set entry point
-	workflow.SetEntryPoint("analyst")
+	workflow.SetEntryPoint("propose")
 
 	// Compile the graph
 	app, err := workflow.Compile()
@@ -454,80 +530,75 @@ func main() {
 
 	ctx := context.Background()
 
-	// Run the mental loop for several days
-	numDays := 3
+	// Create initial market state
+	realMarket := &MarketSimulator{
+		Day:        0,
+		Price:      100.0,
+		Volatility: 0.1, // Standard deviation for price changes
+		Drift:      0.01, // General trend
+		MarketNews: "Market is stable.",
+		Portfolio: Portfolio{
+			Cash:   10000.0,
+			Shares: 0,
+		},
+	}
 
-	for day := 1; day <= numDays; day++ {
-		fmt.Println("\n" + strings.Repeat("=", 80))
-		fmt.Printf("DAY %d - MENTAL LOOP CYCLE\n", day)
-		fmt.Println(strings.Repeat("=", 80))
+	fmt.Println("--- Initial Market State ---")
+	fmt.Println(realMarket.GetStateString())
 
-		// Prepare input state
-		input := map[string]any{
-			"llm":         llm,
-			"agent_state": agentState,
-		}
+	// Day 1: Good News
+	fmt.Println("\n--- Day 1: Good News Hits! ---")
+	realMarket.MarketNews = "Positive earnings report expected."
+	realMarket.Drift = 0.05
 
-		// Run the mental loop
-		result, err := app.Invoke(ctx, input)
-		if err != nil {
-			log.Fatalf("Mental loop execution failed: %v", err)
-		}
+	agentState := &AgentState{RealMarket: realMarket}
+	input := map[string]any{
+		"llm":         llm,
+		"agent_state": agentState,
+	}
 
-		// Extract updated state
-		resultMap := result.(map[string]any)
-		agentState = resultMap["agent_state"].(*AgentState)
+	result, err := app.Invoke(ctx, input)
+	if err != nil {
+		log.Fatalf("Mental loop execution failed: %v", err)
+	}
+	resultMap := result.(map[string]any)
+	agentState = resultMap["agent_state"].(*AgentState)
 
-		// Update market conditions for next day (simulate external events)
-		if day < numDays {
-			updateMarketConditions(agentState.RealMarket, day)
-		}
+	// Day 2: Bad News
+	fmt.Println("\n--- Day 2: Bad News Hits! ---")
+	agentState.RealMarket.MarketNews = "New competitor enters the market."
+	agentState.RealMarket.Drift = -0.05
 
-		fmt.Println()
+	input = map[string]any{
+		"llm":         llm,
+		"agent_state": agentState,
+	}
+
+	result, err = app.Invoke(ctx, input)
+	if err != nil {
+		log.Fatalf("Mental loop execution failed: %v", err)
 	}
 
 	// Print final summary
-	fmt.Println("\n" + strings.Repeat("=", 80))
-	fmt.Println("FINAL RESULTS")
-	fmt.Println(strings.Repeat("=", 80))
-	fmt.Printf("Final Market State: %s\n", agentState.RealMarket.GetStateString())
+	fmt.Println("\n=== 📊 Final Results ===")
+	finalState := result.(map[string]any)["agent_state"].(*AgentState)
+	fmt.Printf("Final Market State: %s\n", finalState.RealMarket.GetStateString())
+
 	initialValue := 10000.0
-	finalValue := agentState.RealMarket.Cash + float64(agentState.RealMarket.Shares)*agentState.RealMarket.Price
+	finalValue := finalState.RealMarket.Portfolio.Value(finalState.RealMarket.Price)
 	totalReturn := finalValue - initialValue
 	returnPct := (totalReturn / initialValue) * 100
 	fmt.Printf("\nTotal Return: $%.2f (%.2f%%)\n", totalReturn, returnPct)
 
-	fmt.Println("\n=== How Mental Loop Works ===")
-	fmt.Println("1. OBSERVE: Analyst observes current market conditions")
-	fmt.Println("2. PROPOSE: Analyst proposes a trading strategy")
-	fmt.Println("3. SIMULATE: Strategy is tested in multiple simulated scenarios")
-	fmt.Println("4. ASSESS: Risk manager evaluates simulation results")
-	fmt.Println("5. REFINE: Risk manager adjusts strategy based on risk/reward")
-	fmt.Println("6. EXECUTE: Final decision is executed in the real market")
+	fmt.Println("\n=== 🎯 Key Takeaways ===")
+	fmt.Println("The Mental Loop architecture enables agents to:")
+	fmt.Println("1. Think before acting by simulating outcomes")
+	fmt.Println("2. Assess risks before committing to real-world actions")
+	fmt.Println("3. Refine strategies based on what-if analysis")
+	fmt.Println("4. Make more nuanced, safer decisions in dynamic environments")
 	fmt.Println()
-	fmt.Println("This 'think before you act' approach reduces costly mistakes")
-	fmt.Println("by allowing the agent to preview outcomes in a safe sandbox.")
-}
-
-// updateMarketConditions simulates changing market conditions between days
-func updateMarketConditions(market *MarketState, day int) {
-	fmt.Println("\n🌍 MARKET UPDATE:")
-
-	// Simulate different market scenarios
-	scenarios := []struct {
-		trend string
-		news  string
-	}{
-		{"bullish", "Strong sector performance reported"},
-		{"bearish", "Major competitor announces new product"},
-		{"neutral", "Mixed economic indicators"},
-		{"bullish", "Analyst upgrades stock rating"},
-		{"bearish", "Regulatory concerns emerge"},
-	}
-
-	if day < len(scenarios) {
-		market.Trend = scenarios[day].trend
-		market.NewsEvent = scenarios[day].news
-		fmt.Printf("New Trend: %s | News: %s\n", market.Trend, market.NewsEvent)
-	}
+	fmt.Println("This pattern is essential for high-stakes domains like:")
+	fmt.Println("- Robotics (simulating movements before executing)")
+	fmt.Println("- Finance (testing trades before real execution)")
+	fmt.Println("- Healthcare (evaluating treatments before application)")
 }

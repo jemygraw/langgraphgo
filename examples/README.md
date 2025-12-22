@@ -42,6 +42,7 @@ This directory contains various examples demonstrating the features of LangGraph
 - **[Reflection Agent](reflection_agent/README.md)**: Iterative improvement agent that refines responses through self-reflection.
 - **[Tree of Thoughts](tree_of_thoughts/README.md)**: Search-based reasoning agent that explores multiple solution paths through a tree structure.
 - **[Mental Loop](mental_loop/README.md)**: Simulator-in-the-Loop agent that tests actions in a sandbox before real-world execution (think before you act).
+- **[Reflexive Metacognitive Agent](reflexive_metacognitive/README.md)**: Self-aware agent with explicit self-model of capabilities and limitations, performs metacognitive analysis before answering (knows what it doesn't know).
 - **[Supervisor](supervisor/README.md)**: Multi-agent orchestration using a supervisor.
 - **[Swarm](swarm/README.md)**: Multi-agent collaboration using handoffs.
 - **[Chat Agent](chat_agent/README.md)**: Multi-turn conversation agent with automatic session management.
@@ -70,8 +71,12 @@ This directory contains various examples demonstrating the features of LangGraph
 - **[RAG with LangChain](rag_with_langchain/README.md)**: RAG using LangChain components.
 - **[RAG with VectorStores](rag_langchain_vectorstore_example/README.md)**: RAG using LangChain VectorStores.
 - **[RAG with Chroma](rag_chroma_example/README.md)**: RAG using Chroma database.
+- **[RAG Query Rewrite](rag_query_rewrite/README.md)**: RAG with query rewriting for better retrieval.
 - **[RAG with FalkorDB Graph](rag_falkordb_graph/README.md)**: RAG using FalkorDB knowledge graph with automatic entity extraction.
 - **[RAG with FalkorDB Simple](rag_falkordb_simple/README.md)**: Simple RAG with FalkorDB using manual entity/relationship creation.
+- **[RAG with FalkorDB Fast](rag_falkordb_fast/README.md)**: Optimized RAG with FalkorDB for fast queries.
+- **[RAG with FalkorDB Debug](rag_falkordb_debug/README.md)**: Debug version of FalkorDB RAG with detailed logging.
+- **[RAG with FalkorDB Debug Query](rag_falkordb_debug_query/README.md)**: Query debugging for FalkorDB RAG.
 
 ## Other
 - **[Visualization](visualization/README.md)**: Generating Mermaid diagrams for graphs.
