@@ -37,7 +37,7 @@ func TestMemoryCheckpointStore_BasicOperations(t *testing.T) {
 			State:     "waiting_for_2fa",
 			Timestamp: time.Now(),
 			Version:   1,
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"user_id":    "alice@example.com",
 				"session_id": "sess-abc-123",
 				"ip_address": "10.0.0.45",
@@ -165,7 +165,7 @@ func TestMemoryCheckpointStore_List(t *testing.T) {
 				State:     "success",
 				Timestamp: time.Now().Add(time.Duration(cp.version) * time.Minute),
 				Version:   cp.version,
-				Metadata: map[string]interface{}{
+				Metadata: map[string]any{
 					"session_id": userSession,
 				},
 			}
@@ -206,7 +206,7 @@ func TestMemoryCheckpointStore_List(t *testing.T) {
 			State:     "success",
 			Timestamp: time.Now(),
 			Version:   1,
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"thread_id": botSession,
 			},
 		}
@@ -260,7 +260,7 @@ func TestMemoryCheckpointStore_List(t *testing.T) {
 			State:     "processing",
 			Timestamp: time.Now(),
 			Version:   1,
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"session_id": userSession,
 				"thread_id":  adminThread,
 			},
@@ -373,7 +373,7 @@ func TestMemoryCheckpointStore_Clear(t *testing.T) {
 			State:     "running",
 			Timestamp: time.Now(),
 			Version:   d.version,
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"workflow_id": d.workflow,
 			},
 		}
@@ -433,16 +433,16 @@ func TestMemoryCheckpointStore_ThreadSafety(t *testing.T) {
 	errs := make(chan error, numGoroutines)
 
 	// Start multiple "workers"
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		go func(workerID int) {
 			defer func() { done <- true }()
 
-			for j := 0; j < checkpointsPerGoroutine; j++ {
+			for j := range checkpointsPerGoroutine {
 				cp := &store.Checkpoint{
 					ID:       fmt.Sprintf("worker-%d-step-%d", workerID, j),
 					NodeName: fmt.Sprintf("handler-%d", workerID),
 					State:    fmt.Sprintf("processing-step-%d", j),
-					Metadata: map[string]interface{}{
+					Metadata: map[string]any{
 						"worker_id":   workerID,
 						"step_number": j,
 						"timestamp":   time.Now().UnixNano(),
@@ -473,7 +473,7 @@ func TestMemoryCheckpointStore_ThreadSafety(t *testing.T) {
 	}
 
 	// Wait for all workers
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		select {
 		case <-done:
 			// Worker finished
@@ -485,8 +485,8 @@ func TestMemoryCheckpointStore_ThreadSafety(t *testing.T) {
 	}
 
 	// Verify all checkpoints are there
-	for i := 0; i < numGoroutines; i++ {
-		for j := 0; j < checkpointsPerGoroutine; j++ {
+	for i := range numGoroutines {
+		for j := range checkpointsPerGoroutine {
 			id := fmt.Sprintf("worker-%d-step-%d", i, j)
 			_, err := ms.Load(ctx, id)
 			if err != nil {

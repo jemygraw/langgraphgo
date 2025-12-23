@@ -371,7 +371,7 @@ func TestRateLimiter(t *testing.T) {
 		}
 
 		// Make 3 calls within the window - all should succeed
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			result, err := runnable.Invoke(context.Background(), "input")
 			if err != nil {
 				t.Fatalf("Call %d failed: %v", i+1, err)

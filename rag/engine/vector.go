@@ -405,29 +405,29 @@ func (v *VectorRAGEngine) buildContext(results []rag.DocumentSearchResult) strin
 		return ""
 	}
 
-	contextStr := ""
+	var contextStr strings.Builder
 	for i, result := range results {
 		doc := result.Document
 
-		contextStr += fmt.Sprintf("Document %d (Score: %.4f):\n", i+1, result.Score)
+		contextStr.WriteString(fmt.Sprintf("Document %d (Score: %.4f):\n", i+1, result.Score))
 
 		// Add key metadata if available
 		if doc.Metadata != nil {
 			if title, ok := doc.Metadata["title"]; ok {
-				contextStr += fmt.Sprintf("Title: %v\n", title)
+				contextStr.WriteString(fmt.Sprintf("Title: %v\n", title))
 			}
 			if source, ok := doc.Metadata["source"]; ok {
-				contextStr += fmt.Sprintf("Source: %v\n", source)
+				contextStr.WriteString(fmt.Sprintf("Source: %v\n", source))
 			}
 			if url, ok := doc.Metadata["url"]; ok {
-				contextStr += fmt.Sprintf("URL: %v\n", url)
+				contextStr.WriteString(fmt.Sprintf("URL: %v\n", url))
 			}
 		}
 
-		contextStr += fmt.Sprintf("Content: %s\n\n", doc.Content)
+		contextStr.WriteString(fmt.Sprintf("Content: %s\n\n", doc.Content))
 	}
 
-	return contextStr
+	return contextStr.String()
 }
 
 // calculateConfidence calculates average confidence from search results
@@ -518,7 +518,7 @@ func cosineSimilarity(a, b []float32) float64 {
 	}
 
 	var dotProduct, normA, normB float32
-	for i := 0; i < len(a); i++ {
+	for i := range a {
 		dotProduct += a[i] * b[i]
 		normA += a[i] * a[i]
 		normB += b[i] * b[i]

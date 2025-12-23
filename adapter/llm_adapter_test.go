@@ -15,7 +15,6 @@ type mockLLM struct {
 	generateContentResult *llms.ContentResponse
 	generateContentError  error
 	calls                 []mockCall
-	forceError            bool
 }
 
 type mockCall struct {

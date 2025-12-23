@@ -274,8 +274,7 @@ func BenchmarkStateGraphTyped_Invoke(b *testing.B) {
 	ctx := context.Background()
 	initialState := TestState{Count: 0}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := runnable.Invoke(ctx, initialState)
 		if err != nil {
 			b.Fatalf("Failed to invoke graph: %v", err)
@@ -302,8 +301,7 @@ func BenchmarkListenableStateGraphTyped_Invoke(b *testing.B) {
 	ctx := context.Background()
 	initialState := TestState{Count: 0}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := runnable.Invoke(ctx, initialState)
 		if err != nil {
 			b.Fatalf("Failed to invoke listenable graph: %v", err)
@@ -438,7 +436,7 @@ func TestStateGraphTyped_ComplexStateType(t *testing.T) {
 			Name    string
 			Version int
 		}
-		Data  map[string]interface{}
+		Data  map[string]any
 		Items []struct {
 			ID   int
 			Tags []string

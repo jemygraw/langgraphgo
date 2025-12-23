@@ -11,7 +11,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func quoteString(i interface{}) interface{} {
+func quoteString(i any) any {
 	switch x := i.(type) {
 	case string:
 		if len(x) == 0 {
@@ -53,7 +53,7 @@ type Node struct {
 	ID         string
 	Alias      string
 	Label      string
-	Properties map[string]interface{}
+	Properties map[string]any
 }
 
 func (n *Node) String() string {
@@ -81,7 +81,7 @@ type Edge struct {
 	Source      *Node
 	Destination *Node
 	Relation    string
-	Properties  map[string]interface{}
+	Properties  map[string]any
 }
 
 func (e *Edge) String() string {
@@ -160,7 +160,7 @@ func (g *Graph) Commit(ctx context.Context) (QueryResult, error) {
 // QueryResult represents the results of a query.
 type QueryResult struct {
 	Header     []string
-	Results    [][]interface{}
+	Results    [][]any
 	Statistics []string
 }
 
@@ -174,14 +174,14 @@ func (g *Graph) Query(ctx context.Context, q string) (QueryResult, error) {
 		return qr, err
 	}
 
-	r, ok := res.([]interface{})
+	r, ok := res.([]any)
 	if !ok {
 		return qr, fmt.Errorf("unexpected response type: %T", res)
 	}
 
 	if len(r) == 3 {
 		// Header
-		if header, ok := r[0].([]interface{}); ok {
+		if header, ok := r[0].([]any); ok {
 			qr.Header = make([]string, len(header))
 			for i, h := range header {
 				qr.Header[i] = fmt.Sprint(h)
@@ -189,17 +189,17 @@ func (g *Graph) Query(ctx context.Context, q string) (QueryResult, error) {
 		}
 
 		// Results
-		if rows, ok := r[1].([]interface{}); ok {
-			qr.Results = make([][]interface{}, len(rows))
+		if rows, ok := r[1].([]any); ok {
+			qr.Results = make([][]any, len(rows))
 			for i, row := range rows {
-				if rVals, ok := row.([]interface{}); ok {
+				if rVals, ok := row.([]any); ok {
 					qr.Results[i] = rVals
 				}
 			}
 		}
 
 		// Stats
-		if stats, ok := r[2].([]interface{}); ok {
+		if stats, ok := r[2].([]any); ok {
 			qr.Statistics = make([]string, len(stats))
 			for i, s := range stats {
 				qr.Statistics[i] = fmt.Sprint(s)
@@ -208,17 +208,17 @@ func (g *Graph) Query(ctx context.Context, q string) (QueryResult, error) {
 
 	} else if len(r) == 2 {
 		// Results
-		if rows, ok := r[0].([]interface{}); ok {
-			qr.Results = make([][]interface{}, len(rows))
+		if rows, ok := r[0].([]any); ok {
+			qr.Results = make([][]any, len(rows))
 			for i, row := range rows {
-				if rVals, ok := row.([]interface{}); ok {
+				if rVals, ok := row.([]any); ok {
 					qr.Results[i] = rVals
 				}
 			}
 		}
 
 		// Stats
-		if stats, ok := r[1].([]interface{}); ok {
+		if stats, ok := r[1].([]any); ok {
 			qr.Statistics = make([]string, len(stats))
 			for i, s := range stats {
 				qr.Statistics[i] = fmt.Sprint(s)
@@ -226,7 +226,7 @@ func (g *Graph) Query(ctx context.Context, q string) (QueryResult, error) {
 		}
 	} else if len(r) == 1 {
 		// Only statistics (e.g., when MERGE operation doesn't return data)
-		if stats, ok := r[0].([]interface{}); ok {
+		if stats, ok := r[0].([]any); ok {
 			qr.Statistics = make([]string, len(stats))
 			for i, s := range stats {
 				qr.Statistics[i] = fmt.Sprint(s)

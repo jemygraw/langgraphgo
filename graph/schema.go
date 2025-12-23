@@ -2,6 +2,7 @@ package graph
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 )
 
@@ -59,9 +60,7 @@ func (s *MapSchema) Update(current, new any) (any, error) {
 
 	// Create a copy of the current map to avoid mutating it directly
 	result := make(map[string]any, len(currMap))
-	for k, v := range currMap {
-		result[k] = v
-	}
+	maps.Copy(result, currMap)
 
 	for k, v := range newMap {
 		if reducer, ok := s.Reducers[k]; ok {

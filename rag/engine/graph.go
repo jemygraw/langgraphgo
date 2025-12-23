@@ -365,36 +365,37 @@ func (g *GraphRAGEngine) buildGraphContext(result *rag.GraphQueryResult, queryEn
 		return "No relevant entities found in the knowledge graph."
 	}
 
-	contextStr := "Knowledge Graph Information:\n\n"
+	var contextStr strings.Builder
+	contextStr.WriteString("Knowledge Graph Information:\n\n")
 
 	// Add entities
-	contextStr += "Relevant Entities:\n"
+	contextStr.WriteString("Relevant Entities:\n")
 	for _, entity := range result.Entities {
-		contextStr += fmt.Sprintf("- %s (%s): %v\n", entity.Name, entity.Type, entity.Properties)
+		contextStr.WriteString(fmt.Sprintf("- %s (%s): %v\n", entity.Name, entity.Type, entity.Properties))
 	}
 
 	// Add relationships
 	if len(result.Relationships) > 0 {
-		contextStr += "\nRelationships:\n"
+		contextStr.WriteString("\nRelationships:\n")
 		for _, rel := range result.Relationships {
-			contextStr += fmt.Sprintf("- %s -> %s (%s)\n",
-				rel.Source, rel.Target, rel.Type)
+			contextStr.WriteString(fmt.Sprintf("- %s -> %s (%s)\n",
+				rel.Source, rel.Target, rel.Type))
 		}
 	}
 
 	// Add paths
 	if len(result.Paths) > 0 {
-		contextStr += "\nEntity Paths:\n"
+		contextStr.WriteString("\nEntity Paths:\n")
 		for i, path := range result.Paths {
 			pathStr := make([]string, len(path))
 			for j, entity := range path {
 				pathStr[j] = fmt.Sprintf("%s(%s)", entity.Name, entity.Type)
 			}
-			contextStr += fmt.Sprintf("Path %d: %s\n", i+1, strings.Join(pathStr, " -> "))
+			contextStr.WriteString(fmt.Sprintf("Path %d: %s\n", i+1, strings.Join(pathStr, " -> ")))
 		}
 	}
 
-	return contextStr
+	return contextStr.String()
 }
 
 // calculateGraphConfidence calculates confidence based on graph results
@@ -444,8 +445,8 @@ func (g *GraphRAGEngine) manualEntityExtraction(ctx context.Context, text string
 	entities := make([]*rag.Entity, 0)
 
 	// Look for capitalized words (potential entities)
-	words := strings.Fields(text)
-	for _, word := range words {
+	words := strings.FieldsSeq(text)
+	for word := range words {
 		if len(word) > 2 && unicode.IsUpper(rune(word[0])) {
 			entity := &rag.Entity{
 				ID:   word,

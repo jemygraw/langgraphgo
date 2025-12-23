@@ -2,6 +2,7 @@ package splitter
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 	"unicode"
 
@@ -78,9 +79,7 @@ func (s *RecursiveCharacterTextSplitter) SplitDocuments(docs []rag.Document) []r
 		for i, chunk := range textChunks {
 			// Create metadata for the chunk
 			metadata := make(map[string]any)
-			for k, v := range doc.Metadata {
-				metadata[k] = v
-			}
+			maps.Copy(metadata, doc.Metadata)
 
 			// Add chunk-specific metadata
 			metadata["chunk_index"] = i
@@ -109,17 +108,18 @@ func (s *RecursiveCharacterTextSplitter) JoinText(chunks []string) string {
 	}
 
 	// Join chunks with overlap consideration
-	result := chunks[0]
+	var result strings.Builder
+	result.WriteString(chunks[0])
 	for i := 1; i < len(chunks); i++ {
 		// Remove overlap from the beginning of current chunk
 		chunk := chunks[i]
 		if len(chunk) > s.chunkOverlap {
 			chunk = chunk[s.chunkOverlap:]
 		}
-		result += " " + chunk
+		result.WriteString(" " + chunk)
 	}
 
-	return result
+	return result.String()
 }
 
 // splitTextRecursive recursively splits text using the provided separators
@@ -348,9 +348,7 @@ func (s *CharacterTextSplitter) SplitDocuments(docs []rag.Document) []rag.Docume
 
 		for i, chunk := range textChunks {
 			metadata := make(map[string]any)
-			for k, v := range doc.Metadata {
-				metadata[k] = v
-			}
+			maps.Copy(metadata, doc.Metadata)
 
 			metadata["chunk_index"] = i
 			metadata["chunk_total"] = len(textChunks)
@@ -516,9 +514,7 @@ func (s *TokenTextSplitter) SplitDocuments(docs []rag.Document) []rag.Document {
 
 		for i, chunk := range textChunks {
 			metadata := make(map[string]any)
-			for k, v := range doc.Metadata {
-				metadata[k] = v
-			}
+			maps.Copy(metadata, doc.Metadata)
 
 			metadata["chunk_index"] = i
 			metadata["chunk_total"] = len(textChunks)

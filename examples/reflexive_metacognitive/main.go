@@ -46,19 +46,19 @@ import (
 // AgentSelfModel is a structured representation of the agent's capabilities
 // and limitations — the foundation of its self-awareness.
 type AgentSelfModel struct {
-	Name               string
-	Role               string
-	KnowledgeDomain    []string // Topics the agent is knowledgeable about
-	AvailableTools     []string // Tools the agent can use
+	Name                string
+	Role                string
+	KnowledgeDomain     []string // Topics the agent is knowledgeable about
+	AvailableTools      []string // Tools the agent can use
 	ConfidenceThreshold float64  // Confidence below which the agent must escalate
 }
 
 // MetacognitiveAnalysis represents the agent's self-analysis of a query
 type MetacognitiveAnalysis struct {
-	Confidence float64 // 0.0 to 1.0 - confidence in ability to answer safely
-	Strategy   string  // "reason_directly", "use_tool", or "escalate"
-	Reasoning  string  // Justification for the chosen confidence and strategy
-	ToolToUse  string  // If strategy is "use_tool", the name of the tool
+	Confidence float64           // 0.0 to 1.0 - confidence in ability to answer safely
+	Strategy   string            // "reason_directly", "use_tool", or "escalate"
+	Reasoning  string            // Justification for the chosen confidence and strategy
+	ToolToUse  string            // If strategy is "use_tool", the name of the tool
 	ToolArgs   map[string]string // If strategy is "use_tool", the arguments
 }
 
@@ -377,10 +377,10 @@ func main() {
 
 	// Define the agent's self-model
 	medicalAgentModel := &AgentSelfModel{
-		Name:            "TriageBot-3000",
-		Role:            "A helpful AI assistant for providing preliminary medical information",
-		KnowledgeDomain: []string{"common_cold", "influenza", "allergies", "headaches", "basic_first_aid"},
-		AvailableTools:  []string{"drug_interaction_checker"},
+		Name:                "TriageBot-3000",
+		Role:                "A helpful AI assistant for providing preliminary medical information",
+		KnowledgeDomain:     []string{"common_cold", "influenza", "allergies", "headaches", "basic_first_aid"},
+		AvailableTools:      []string{"drug_interaction_checker"},
 		ConfidenceThreshold: 0.6,
 	}
 

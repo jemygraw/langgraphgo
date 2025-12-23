@@ -53,11 +53,11 @@ type AgentSelfModel struct {
 
 // MetacognitiveAnalysis 表示代理对查询的自我分析结果
 type MetacognitiveAnalysis struct {
-	Confidence float64            // 0.0 到 1.0 - 安全准确回答的置信度
-	Strategy   string             // "reason_directly"、"use_tool" 或 "escalate"
-	Reasoning  string             // 选择该置信度和策略的理由
-	ToolToUse  string             // 如果策略是"use_tool"，则为工具名称
-	ToolArgs   map[string]string  // 如果策略是"use_tool"，则为工具参数
+	Confidence float64           // 0.0 到 1.0 - 安全准确回答的置信度
+	Strategy   string            // "reason_directly"、"use_tool" 或 "escalate"
+	Reasoning  string            // 选择该置信度和策略的理由
+	ToolToUse  string            // 如果策略是"use_tool"，则为工具名称
+	ToolArgs   map[string]string // 如果策略是"use_tool"，则为工具参数
 }
 
 // AgentState 表示在图中节点之间传递的状态
@@ -90,7 +90,7 @@ func NewDrugInteractionChecker() *DrugInteractionChecker {
 	return &DrugInteractionChecker{
 		knownInteractions: map[string]string{
 			"布洛芬+赖诺普利": "中度风险：布洛芬可能降低赖诺普利的降压效果。建议监测血压。",
-			"阿司匹林+华法林":   "高风险：出血风险增加。除非医生指导，否则应避免同时使用。",
+			"阿司匹林+华法林": "高风险：出血风险增加。除非医生指导，否则应避免同时使用。",
 		},
 	}
 }

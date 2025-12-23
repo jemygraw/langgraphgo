@@ -100,9 +100,9 @@ func (p *PlannerAgent) parseQuestions(response string) []string {
 	var questions []string
 
 	// Split by lines
-	lines := strings.Split(response, "\n")
+	lines := strings.SplitSeq(response, "\n")
 
-	for _, line := range lines {
+	for line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -112,20 +112,20 @@ func (p *PlannerAgent) parseQuestions(response string) []string {
 		line = strings.TrimPrefix(line, "- ")
 		for i := 1; i <= 20; i++ {
 			prefix := fmt.Sprintf("%d.", i)
-			if strings.HasPrefix(line, prefix) {
-				line = strings.TrimPrefix(line, prefix)
+			if after, ok := strings.CutPrefix(line, prefix); ok {
+				line = after
 				line = strings.TrimSpace(line)
 				break
 			}
 			prefix = fmt.Sprintf("%d)", i)
-			if strings.HasPrefix(line, prefix) {
-				line = strings.TrimPrefix(line, prefix)
+			if after, ok := strings.CutPrefix(line, prefix); ok {
+				line = after
 				line = strings.TrimSpace(line)
 				break
 			}
 			prefix = fmt.Sprintf("Q%d:", i)
-			if strings.HasPrefix(line, prefix) {
-				line = strings.TrimPrefix(line, prefix)
+			if after, ok := strings.CutPrefix(line, prefix); ok {
+				line = after
 				line = strings.TrimSpace(line)
 				break
 			}

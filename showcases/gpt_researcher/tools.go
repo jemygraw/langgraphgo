@@ -227,11 +227,3 @@ func (tr *ToolRegistry) GetTools() []tools.Tool {
 		tr.SummarizerTool,
 	}
 }
-
-// Helper function
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}

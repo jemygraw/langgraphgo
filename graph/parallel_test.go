@@ -20,7 +20,7 @@ func TestParallelNodes(t *testing.T) {
 
 	// Add parallel nodes
 	parallelFuncs := make(map[string]func(context.Context, any) (any, error))
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		id := fmt.Sprintf("worker_%d", i)
 		parallelFuncs[id] = func(workerID string) func(context.Context, any) (any, error) {
 			return func(ctx context.Context, state any) (any, error) {
@@ -268,13 +268,13 @@ func BenchmarkParallelExecution(b *testing.B) {
 
 	// Create many parallel workers
 	workers := make(map[string]func(context.Context, any) (any, error))
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		workerID := fmt.Sprintf("worker_%d", i)
 		workers[workerID] = func(ctx context.Context, state any) (any, error) {
 			// Simulate some work
 			n := state.(int)
 			result := 0
-			for j := 0; j < 100; j++ {
+			for j := range 100 {
 				result += n * j
 			}
 			return result, nil
@@ -292,8 +292,7 @@ func BenchmarkParallelExecution(b *testing.B) {
 
 	ctx := context.Background()
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		_, err := runnable.Invoke(ctx, i)
 		if err != nil {
 			b.Fatalf("Execution failed: %v", err)
@@ -306,7 +305,7 @@ func BenchmarkSequentialVsParallel(b *testing.B) {
 		// Simulate CPU-bound work
 		n := state.(int)
 		result := 0
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			result += n * i
 		}
 		return result, nil
@@ -316,7 +315,7 @@ func BenchmarkSequentialVsParallel(b *testing.B) {
 		g := graph.NewStateGraph()
 
 		// Chain nodes sequentially
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			nodeName := fmt.Sprintf("node_%d", i)
 			g.AddNode(nodeName, nodeName, workFunc)
 			if i > 0 {
@@ -341,7 +340,7 @@ func BenchmarkSequentialVsParallel(b *testing.B) {
 
 		// Add nodes in parallel
 		workers := make(map[string]func(context.Context, any) (any, error))
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			workers[fmt.Sprintf("worker_%d", i)] = workFunc
 		}
 

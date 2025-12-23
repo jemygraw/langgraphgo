@@ -107,13 +107,10 @@ func (r *RetrievalMemory) GetContext(ctx context.Context, query string) ([]*Mess
 	})
 
 	// Return top K messages
-	k := r.topK
-	if k > len(scores) {
-		k = len(scores)
-	}
+	k := min(r.topK, len(scores))
 
 	result := make([]*Message, k)
-	for i := 0; i < k; i++ {
+	for i := range k {
 		result[i] = scores[i].message
 	}
 
@@ -143,11 +140,8 @@ func (r *RetrievalMemory) GetStats(ctx context.Context) (*Stats, error) {
 	// Active tokens = tokens in topK messages (approximate)
 	activeTokens := 0
 	if len(r.messages) > 0 {
-		k := r.topK
-		if k > len(r.messages) {
-			k = len(r.messages)
-		}
-		for i := 0; i < k; i++ {
+		k := min(r.topK, len(r.messages))
+		for i := range k {
 			activeTokens += r.messages[i].TokenCount
 		}
 	}

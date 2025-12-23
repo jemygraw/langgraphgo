@@ -211,7 +211,7 @@ func processParagraph(ctx context.Context, llm llms.Model, p *schema.Paragraph) 
 
 	// --- Reflection Loop (Max 1 for now to save time/tokens) ---
 	maxReflections := 1
-	for i := 0; i < maxReflections; i++ {
+	for i := range maxReflections {
 		fmt.Printf("    正在反思 (%d/%d)...\n", i+1, maxReflections)
 
 		var reflectionOutput struct {

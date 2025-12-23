@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 )
 
 // BaseEngine provides common functionality for RAG engines
@@ -175,29 +176,29 @@ func (e *BaseEngine) buildContext(results []DocumentSearchResult, includeScores 
 		return ""
 	}
 
-	context := ""
+	var context strings.Builder
 	for i, result := range results {
 		doc := result.Document
 
-		context += fmt.Sprintf("Document %d:\n", i+1)
+		context.WriteString(fmt.Sprintf("Document %d:\n", i+1))
 		if includeScores {
-			context += fmt.Sprintf("Score: %.4f\n", result.Score)
+			context.WriteString(fmt.Sprintf("Score: %.4f\n", result.Score))
 		}
 
 		// Add key metadata if available
 		if doc.Metadata != nil {
 			if title, ok := doc.Metadata["title"]; ok {
-				context += fmt.Sprintf("Title: %v\n", title)
+				context.WriteString(fmt.Sprintf("Title: %v\n", title))
 			}
 			if source, ok := doc.Metadata["source"]; ok {
-				context += fmt.Sprintf("Source: %v\n", source)
+				context.WriteString(fmt.Sprintf("Source: %v\n", source))
 			}
 		}
 
-		context += fmt.Sprintf("Content: %s\n\n", doc.Content)
+		context.WriteString(fmt.Sprintf("Content: %s\n\n", doc.Content))
 	}
 
-	return context
+	return context.String()
 }
 
 // calculateConfidence calculates average confidence from search results

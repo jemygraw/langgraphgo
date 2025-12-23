@@ -89,11 +89,12 @@ func PlannerNode(ctx context.Context, state any) (any, error) {
 	}
 
 	// Format plan for better readability
-	formattedPlan := "生成的计划：\n"
+	var formattedPlan strings.Builder
+	formattedPlan.WriteString("生成的计划：\n")
 	for _, step := range s.Plan {
-		formattedPlan += fmt.Sprintf("%s\n", step)
+		formattedPlan.WriteString(fmt.Sprintf("%s\n", step))
 	}
-	logf(ctx, "%s", formattedPlan)
+	logf(ctx, "%s", formattedPlan.String())
 	if s.GeneratePodcast {
 		logf(ctx, "检测到播客生成意图。\n")
 	}

@@ -2,6 +2,7 @@ package graph
 
 import (
 	"context"
+	"maps"
 	"sync"
 	"testing"
 	"time"
@@ -117,15 +118,11 @@ func TestStateGraph_ParallelExecution(t *testing.T) {
 	merger := func(ctx context.Context, current any, newStates []any) (any, error) {
 		merged := make(State)
 		// Copy current
-		for k, v := range current.(State) {
-			merged[k] = v
-		}
+		maps.Copy(merged, current.(State))
 		// Merge new states
 		for _, s := range newStates {
 			ns := s.(State)
-			for k, v := range ns {
-				merged[k] = v
-			}
+			maps.Copy(merged, ns)
 		}
 		return merged, nil
 	}
@@ -133,18 +130,14 @@ func TestStateGraph_ParallelExecution(t *testing.T) {
 
 	g.AddNode("A", "A", func(ctx context.Context, state any) (any, error) {
 		s := make(State)
-		for k, v := range state.(State) {
-			s[k] = v
-		}
+		maps.Copy(s, state.(State))
 		s["A"] = 1
 		return s, nil
 	})
 
 	g.AddNode("B", "B", func(ctx context.Context, state any) (any, error) {
 		s := make(State)
-		for k, v := range state.(State) {
-			s[k] = v
-		}
+		maps.Copy(s, state.(State))
 		s["B"] = 1
 		time.Sleep(10 * time.Millisecond)
 		return s, nil
@@ -152,9 +145,7 @@ func TestStateGraph_ParallelExecution(t *testing.T) {
 
 	g.AddNode("C", "C", func(ctx context.Context, state any) (any, error) {
 		s := make(State)
-		for k, v := range state.(State) {
-			s[k] = v
-		}
+		maps.Copy(s, state.(State))
 		s["C"] = 1
 		time.Sleep(10 * time.Millisecond)
 		return s, nil

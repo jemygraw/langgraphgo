@@ -1,4 +1,4 @@
-.PHONY: help all build test test-race test-coverage test-verbose lint fmt vet clean deps tidy check examples docs install-tools benchmark
+.PHONY: help all build test test-race test-coverage test-verbose lint fmt vet clean deps tidy check examples docs install-tools benchmark modernize
 
 # Variables
 GOCMD=go
@@ -21,7 +21,7 @@ COLOR_YELLOW=\033[33m
 COLOR_BLUE=\033[34m
 
 # Default target
-all: check test build
+all: modernize check test build
 
 ## help: Display this help message
 help:
@@ -74,6 +74,11 @@ test-verbose:
 benchmark:
 	@echo "$(COLOR_BLUE)Running benchmarks...$(COLOR_RESET)"
 	$(GOTEST) -bench=. -benchmem ./...
+
+## modernize: Run modernize to apply fixes to all packages
+modernize:
+	@echo "$(COLOR_BLUE)Running modernize...$(COLOR_RESET)"
+	modernize -fix -test ./...
 
 ## lint: Run golangci-lint
 lint:

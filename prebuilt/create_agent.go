@@ -416,9 +416,9 @@ func discoverSkills(skillDir string) (map[string]*goskills.SkillPackage, error) 
 }
 
 func selectSkill(ctx context.Context, model llms.Model, userPrompt string, availableSkills map[string]*goskills.SkillPackage) (string, error) {
-	var skillDescriptions string
+	var skillDescriptions strings.Builder
 	for name, pkg := range availableSkills {
-		skillDescriptions += fmt.Sprintf("- %s: %s\n", name, pkg.Meta.Description)
+		skillDescriptions.WriteString(fmt.Sprintf("- %s: %s\n", name, pkg.Meta.Description))
 	}
 
 	prompt := fmt.Sprintf(`You are an intelligent agent that selects the most appropriate skill to handle a user's request.
@@ -434,7 +434,7 @@ Instructions:
 3. If a skill is relevant, output ONLY the name of the skill.
 4. If no skill is relevant, output "None".
 
-Output:`, skillDescriptions, userPrompt)
+Output:`, skillDescriptions.String(), userPrompt)
 
 	resp, err := model.GenerateContent(ctx, []llms.MessageContent{
 		llms.TextParts(llms.ChatMessageTypeHuman, prompt),

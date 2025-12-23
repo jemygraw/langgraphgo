@@ -289,7 +289,7 @@ func TestConcurrentExecution(t *testing.T) {
 	// Run multiple executions concurrently
 	done := make(chan bool, 3)
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		go func(id int) {
 			code := `
 result = test("input")
@@ -304,7 +304,7 @@ print(result)
 	}
 
 	// Wait for all executions to complete
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		select {
 		case <-done:
 			// Success

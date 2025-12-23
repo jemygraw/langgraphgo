@@ -80,7 +80,7 @@ type FinalDecision struct {
 
 // SimulationResult stores the outcome of one simulation run
 type SimulationResult struct {
-	SimNum      int
+	SimNum       int
 	InitialValue float64
 	FinalValue   float64
 	ReturnPct    float64
@@ -534,7 +534,7 @@ func main() {
 	realMarket := &MarketSimulator{
 		Day:        0,
 		Price:      100.0,
-		Volatility: 0.1, // Standard deviation for price changes
+		Volatility: 0.1,  // Standard deviation for price changes
 		Drift:      0.01, // General trend
 		MarketNews: "Market is stable.",
 		Portfolio: Portfolio{

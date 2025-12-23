@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"os"
 	"sync"
 	"time"
@@ -255,9 +256,7 @@ func (ml *MetricsListener) GetNodeExecutions() map[string]int {
 	defer ml.mutex.RUnlock()
 
 	result := make(map[string]int)
-	for k, v := range ml.nodeExecutions {
-		result[k] = v
-	}
+	maps.Copy(result, ml.nodeExecutions)
 	return result
 }
 
@@ -267,9 +266,7 @@ func (ml *MetricsListener) GetNodeErrors() map[string]int {
 	defer ml.mutex.RUnlock()
 
 	result := make(map[string]int)
-	for k, v := range ml.nodeErrors {
-		result[k] = v
-	}
+	maps.Copy(result, ml.nodeErrors)
 	return result
 }
 

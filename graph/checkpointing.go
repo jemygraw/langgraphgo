@@ -3,6 +3,7 @@ package graph
 import (
 	"context"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/google/uuid"
@@ -389,12 +390,8 @@ func (cr *CheckpointableRunnable) UpdateState(ctx context.Context, config *Confi
 			if valMap, ok := values.(map[string]any); ok {
 				// Create a new map for the merged state to avoid mutating the original
 				merged := make(map[string]any)
-				for k, v := range curMap {
-					merged[k] = v
-				}
-				for k, v := range valMap {
-					merged[k] = v
-				}
+				maps.Copy(merged, curMap)
+				maps.Copy(merged, valMap)
 				newState = merged
 			}
 		}

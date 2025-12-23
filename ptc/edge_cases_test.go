@@ -151,7 +151,7 @@ func TestExecutorWithLargeCode(t *testing.T) {
 
 	// Generate large code block (many print statements)
 	var codeBuilder strings.Builder
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		codeBuilder.WriteString("print('Line " + string(rune(i)) + "')\n")
 	}
 

@@ -80,10 +80,7 @@ func (rn *RetryNode) Execute(ctx context.Context, state any) (any, error) {
 			select {
 			case <-time.After(delay):
 				// Calculate next delay with backoff
-				delay = time.Duration(float64(delay) * rn.config.BackoffFactor)
-				if delay > rn.config.MaxDelay {
-					delay = rn.config.MaxDelay
-				}
+				delay = min(time.Duration(float64(delay)*rn.config.BackoffFactor), rn.config.MaxDelay)
 			case <-ctx.Done():
 				return nil, fmt.Errorf("retry cancelled during backoff: %w", ctx.Err())
 			}
@@ -341,7 +338,7 @@ func ExponentialBackoffRetry(
 	maxAttempts int,
 	baseDelay time.Duration,
 ) (any, error) {
-	for attempt := 0; attempt < maxAttempts; attempt++ {
+	for attempt := range maxAttempts {
 		result, err := fn()
 		if err == nil {
 			return result, nil

@@ -144,21 +144,21 @@ func (e *ExecutionAgent) parseSearchResults(toolOutput string, question string) 
 				results = append(results, *currentResult)
 			}
 			currentResult = &SearchResult{Question: question}
-		} else if strings.HasPrefix(line, "Title: ") {
+		} else if after, ok := strings.CutPrefix(line, "Title: "); ok {
 			if currentResult != nil {
-				currentResult.Title = strings.TrimPrefix(line, "Title: ")
+				currentResult.Title = after
 			}
-		} else if strings.HasPrefix(line, "URL: ") {
+		} else if after, ok := strings.CutPrefix(line, "URL: "); ok {
 			if currentResult != nil {
-				currentResult.URL = strings.TrimPrefix(line, "URL: ")
+				currentResult.URL = after
 			}
-		} else if strings.HasPrefix(line, "Content: ") {
+		} else if after, ok := strings.CutPrefix(line, "Content: "); ok {
 			if currentResult != nil {
-				currentResult.Content = strings.TrimPrefix(line, "Content: ")
+				currentResult.Content = after
 			}
-		} else if strings.HasPrefix(line, "Relevance Score: ") {
+		} else if after, ok := strings.CutPrefix(line, "Relevance Score: "); ok {
 			if currentResult != nil {
-				scoreStr := strings.TrimPrefix(line, "Relevance Score: ")
+				scoreStr := after
 				if _, err := fmt.Sscanf(scoreStr, "%f", &currentResult.Score); err != nil {
 					currentResult.Score = 0.0 // Default score on parse error
 				}
@@ -235,13 +235,13 @@ func (e *ExecutionAgent) parseSummaryResponse(response string, result SearchResu
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 
-		if strings.HasPrefix(line, "Summary: ") {
-			summary.Summary = strings.TrimPrefix(line, "Summary: ")
+		if after, ok := strings.CutPrefix(line, "Summary: "); ok {
+			summary.Summary = after
 			summary.Summary = strings.TrimSpace(summary.Summary)
 		} else if strings.Contains(line, "Key Points:") {
 			inKeyPoints = true
-		} else if strings.HasPrefix(line, "Relevance: ") {
-			relevanceStr := strings.TrimPrefix(line, "Relevance: ")
+		} else if after, ok := strings.CutPrefix(line, "Relevance: "); ok {
+			relevanceStr := after
 			if _, err := fmt.Sscanf(relevanceStr, "%f", &summary.Relevance); err != nil {
 				summary.Relevance = 0.0 // Default relevance on parse error
 			}

@@ -87,7 +87,7 @@ func TestLargeGraph(t *testing.T) {
 
 	// Create a chain of 1000 nodes
 	nodeCount := 1000
-	for i := 0; i < nodeCount; i++ {
+	for i := range nodeCount {
 		nodeName := fmt.Sprintf("node_%d", i)
 		g.AddNode(nodeName, nodeName, func(ctx context.Context, state any) (any, error) {
 			counter := state.(int)
@@ -149,7 +149,7 @@ func TestConcurrentExecution(t *testing.T) {
 	var wg sync.WaitGroup
 	errors := make(chan error, concurrency)
 
-	for i := 0; i < concurrency; i++ {
+	for i := range concurrency {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
@@ -622,7 +622,7 @@ func BenchmarkConditionalEdges(b *testing.B) {
 		return state, nil
 	})
 
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		nodeName := fmt.Sprintf("node_%d", i)
 		g.AddNode(nodeName, nodeName, func(ctx context.Context, state any) (any, error) {
 			n := state.(int)
@@ -645,8 +645,7 @@ func BenchmarkConditionalEdges(b *testing.B) {
 
 	ctx := context.Background()
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		_, err := runnable.Invoke(ctx, i)
 		if err != nil {
 			b.Fatalf("Execution failed: %v", err)
@@ -683,10 +682,9 @@ func BenchmarkLargeStateTransfer(b *testing.B) {
 	largeState := make([]byte, 1024*1024)
 	ctx := context.Background()
 
-	b.ResetTimer()
 	b.SetBytes(int64(len(largeState)))
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := runnable.Invoke(ctx, largeState)
 		if err != nil {
 			b.Fatalf("Execution failed: %v", err)

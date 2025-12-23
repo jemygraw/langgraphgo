@@ -484,7 +484,7 @@ func TestCreateReactAgentTyped_EmptyToolName(t *testing.T) {
 func TestCreateReactAgentTyped_LargeNumberOfTools(t *testing.T) {
 	// Create many tools
 	tools := make([]tools.Tool, 100)
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		tools[i] = &MockToolForReact{
 			name:        fmt.Sprintf("tool_%d", i),
 			description: fmt.Sprintf("Tool number %d", i),
@@ -1091,7 +1091,7 @@ func TestReactAgentState_MessageHandling(t *testing.T) {
 func TestCreateReactAgentTyped_LargeMessageHistory(t *testing.T) {
 	// Create state with many messages
 	var messages []llms.MessageContent
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		if i%2 == 0 {
 			messages = append(messages, llms.TextParts(llms.ChatMessageTypeHuman, fmt.Sprintf("Message %d", i)))
 		} else {

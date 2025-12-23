@@ -1,6 +1,7 @@
 package splitter
 
 import (
+	"maps"
 	"strings"
 
 	"github.com/smallnest/langgraphgo/rag"
@@ -43,9 +44,7 @@ func (s *SimpleTextSplitter) SplitDocuments(documents []rag.Document) []rag.Docu
 			}
 
 			// Copy metadata
-			for k, v := range doc.Metadata {
-				newDoc.Metadata[k] = v
-			}
+			maps.Copy(newDoc.Metadata, doc.Metadata)
 
 			// Add chunk metadata
 			newDoc.Metadata["chunk_index"] = i
@@ -102,10 +101,7 @@ func (s *SimpleTextSplitter) splitText(text string) []string {
 			nextStart = end
 		}
 
-		start = nextStart
-		if start < 0 {
-			start = 0
-		}
+		start = max(nextStart, 0)
 	}
 
 	return chunks

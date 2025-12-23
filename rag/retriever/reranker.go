@@ -52,7 +52,7 @@ func (r *SimpleReranker) Rerank(ctx context.Context, query string, documents []r
 	}
 
 	// Sort by score (descending)
-	for i := 0; i < len(scores); i++ {
+	for i := range scores {
 		for j := i + 1; j < len(scores); j++ {
 			if scores[j].score > scores[i].score {
 				scores[i], scores[j] = scores[j], scores[i]

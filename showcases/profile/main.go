@@ -221,8 +221,8 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 	resHtml := <-resultChan
 	if resHtml != "" {
 		fmt.Fprintf(w, "event: result\n")
-		lines := strings.Split(resHtml, "\n")
-		for _, line := range lines {
+		lines := strings.SplitSeq(resHtml, "\n")
+		for line := range lines {
 			fmt.Fprintf(w, "data: %s\n", line)
 		}
 		fmt.Fprintf(w, "\n")

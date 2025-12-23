@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 )
@@ -245,10 +246,8 @@ func (r *StateRunnableTyped[S]) InvokeWithConfig(ctx context.Context, initialSta
 		// Check InterruptBefore
 		if config != nil && len(config.InterruptBefore) > 0 {
 			for _, node := range currentNodes {
-				for _, interrupt := range config.InterruptBefore {
-					if node == interrupt {
-						return state, &GraphInterrupt{Node: node, State: state}
-					}
+				if slices.Contains(config.InterruptBefore, node) {
+					return state, &GraphInterrupt{Node: node, State: state}
 				}
 			}
 		}
@@ -324,13 +323,11 @@ func (r *StateRunnableTyped[S]) InvokeWithConfig(ctx context.Context, initialSta
 		// Check InterruptAfter
 		if config != nil && len(config.InterruptAfter) > 0 {
 			for _, node := range nodesRan {
-				for _, interrupt := range config.InterruptAfter {
-					if node == interrupt {
-						return state, &GraphInterrupt{
-							Node:      node,
-							State:     state,
-							NextNodes: nextNodesList,
-						}
+				if slices.Contains(config.InterruptAfter, node) {
+					return state, &GraphInterrupt{
+						Node:      node,
+						State:     state,
+						NextNodes: nextNodesList,
 					}
 				}
 			}

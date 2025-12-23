@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/url"
 	"regexp"
 	"strings"
@@ -298,10 +299,10 @@ func sanitizeLabel(l string) string {
 	return clean
 }
 
-func propsToString(m map[string]interface{}) string {
+func propsToString(m map[string]any) string {
 	parts := []string{}
 	for k, v := range m {
-		var val interface{}
+		var val any
 		switch v := v.(type) {
 		case []float32:
 			// Convert to Cypher list: [v1, v2, ...]
@@ -318,11 +319,9 @@ func propsToString(m map[string]interface{}) string {
 	return "{" + strings.Join(parts, ", ") + "}"
 }
 
-func entityToMap(e *rag.Entity) map[string]interface{} {
-	m := make(map[string]interface{})
-	for k, v := range e.Properties {
-		m[k] = v
-	}
+func entityToMap(e *rag.Entity) map[string]any {
+	m := make(map[string]any)
+	maps.Copy(m, e.Properties)
 	m["name"] = e.Name
 	m["type"] = e.Type
 
@@ -332,18 +331,16 @@ func entityToMap(e *rag.Entity) map[string]interface{} {
 	return m
 }
 
-func relationshipToMap(r *rag.Relationship) map[string]interface{} {
-	m := make(map[string]interface{})
-	for k, v := range r.Properties {
-		m[k] = v
-	}
+func relationshipToMap(r *rag.Relationship) map[string]any {
+	m := make(map[string]any)
+	maps.Copy(m, r.Properties)
 	m["weight"] = r.Weight
 	m["confidence"] = r.Confidence
 	m["type"] = r.Type
 	return m
 }
 
-func toString(i interface{}) string {
+func toString(i any) string {
 	if s, ok := i.(string); ok {
 		return s
 	}
@@ -355,20 +352,20 @@ func toString(i interface{}) string {
 
 // Parsing Helpers
 
-func parseNode(obj interface{}) *rag.Entity {
-	vals, ok := obj.([]interface{})
+func parseNode(obj any) *rag.Entity {
+	vals, ok := obj.([]any)
 	if !ok {
 		return nil
 	}
 
 	e := &rag.Entity{
-		Properties: make(map[string]interface{}),
+		Properties: make(map[string]any),
 	}
 
 	// Check for KV list format: [[key, val], [key, val], ...]
 	// FalkorDB sometimes returns this structure
 	if len(vals) > 0 {
-		if first, ok := vals[0].([]interface{}); ok && len(first) == 2 {
+		if first, ok := vals[0].([]any); ok && len(first) == 2 {
 			k := toString(first[0])
 			if k == "id" || k == "labels" || k == "properties" {
 				return parseNodeKV(vals)
@@ -379,7 +376,7 @@ func parseNode(obj interface{}) *rag.Entity {
 	// Standard format: [id, labels, properties]
 	if len(vals) >= 3 {
 		// Labels
-		if labels, ok := vals[1].([]interface{}); ok && len(labels) > 0 {
+		if labels, ok := vals[1].([]any); ok && len(labels) > 0 {
 			if l, ok := labels[0].([]byte); ok {
 				e.Type = string(l)
 			} else if l, ok := labels[0].(string); ok {
@@ -388,13 +385,13 @@ func parseNode(obj interface{}) *rag.Entity {
 		}
 
 		// Properties
-		if props, ok := vals[2].([]interface{}); ok {
+		if props, ok := vals[2].([]any); ok {
 			parseFalkorDBProperties(props, e)
 		}
 	} else if len(vals) >= 2 {
 		// FalkorDB format: [node_id, complex_structure]
-		if complexStruct, ok := vals[1].([]interface{}); ok && len(complexStruct) >= 3 {
-			if props, ok := complexStruct[2].([]interface{}); ok {
+		if complexStruct, ok := vals[1].([]any); ok && len(complexStruct) >= 3 {
+			if props, ok := complexStruct[2].([]any); ok {
 				parseFalkorDBProperties(props, e)
 			}
 		}
@@ -403,10 +400,10 @@ func parseNode(obj interface{}) *rag.Entity {
 	return e
 }
 
-func parseNodeKV(pairs []interface{}) *rag.Entity {
-	e := &rag.Entity{Properties: make(map[string]interface{})}
+func parseNodeKV(pairs []any) *rag.Entity {
+	e := &rag.Entity{Properties: make(map[string]any)}
 	for _, item := range pairs {
-		pair, ok := item.([]interface{})
+		pair, ok := item.([]any)
 		if !ok || len(pair) != 2 {
 			continue
 		}
@@ -417,13 +414,13 @@ func parseNodeKV(pairs []interface{}) *rag.Entity {
 		case "id":
 			e.ID = toString(val)
 		case "labels":
-			if lbls, ok := val.([]interface{}); ok && len(lbls) > 0 {
+			if lbls, ok := val.([]any); ok && len(lbls) > 0 {
 				e.Type = toString(lbls[0])
 			}
 		case "properties":
-			if props, ok := val.([]interface{}); ok {
+			if props, ok := val.([]any); ok {
 				for _, p := range props {
-					if kv, ok := p.([]interface{}); ok && len(kv) == 2 {
+					if kv, ok := p.([]any); ok && len(kv) == 2 {
 						pk := toString(kv[0])
 						pv := toString(kv[1])
 						if pk == "id" {
@@ -443,8 +440,8 @@ func parseNodeKV(pairs []interface{}) *rag.Entity {
 	return e
 }
 
-func parseEdge(obj interface{}, sourceID, targetID string) *rag.Relationship {
-	vals, ok := obj.([]interface{})
+func parseEdge(obj any, sourceID, targetID string) *rag.Relationship {
+	vals, ok := obj.([]any)
 	if !ok {
 		return nil
 	}
@@ -452,17 +449,17 @@ func parseEdge(obj interface{}, sourceID, targetID string) *rag.Relationship {
 	rel := &rag.Relationship{
 		Source:     sourceID,
 		Target:     targetID,
-		Properties: make(map[string]interface{}),
+		Properties: make(map[string]any),
 	}
 
 	// Check for KV list format: [[key, val], [key, val], ...]
 	if len(vals) > 0 {
-		if first, ok := vals[0].([]interface{}); ok && len(first) == 2 {
+		if first, ok := vals[0].([]any); ok && len(first) == 2 {
 			k := toString(first[0])
 			if k == "id" || k == "type" || k == "properties" || k == "src" || k == "dst" {
 				// Parse KV edge
 				for _, item := range vals {
-					pair, ok := item.([]interface{})
+					pair, ok := item.([]any)
 					if !ok || len(pair) != 2 {
 						continue
 					}
@@ -475,9 +472,9 @@ func parseEdge(obj interface{}, sourceID, targetID string) *rag.Relationship {
 					case "type":
 						rel.Type = toString(val)
 					case "properties":
-						if props, ok := val.([]interface{}); ok {
+						if props, ok := val.([]any); ok {
 							for _, p := range props {
-								if kv, ok := p.([]interface{}); ok && len(kv) == 2 {
+								if kv, ok := p.([]any); ok && len(kv) == 2 {
 									pk := toString(kv[0])
 									pv := toString(kv[1])
 									if pk == "id" {
@@ -510,9 +507,9 @@ func parseEdge(obj interface{}, sourceID, targetID string) *rag.Relationship {
 
 	// Properties (Index 4 usually, but check len)
 	if len(vals) > 4 {
-		if props, ok := vals[4].([]interface{}); ok {
-			for i := 0; i < len(props); i++ {
-				if propPair, ok := props[i].([]interface{}); ok && len(propPair) == 2 {
+		if props, ok := vals[4].([]any); ok {
+			for i := range props {
+				if propPair, ok := props[i].([]any); ok && len(propPair) == 2 {
 					key := toString(propPair[0])
 					val := propPair[1]
 					if b, ok := val.([]byte); ok {
@@ -536,7 +533,7 @@ func parseEdge(obj interface{}, sourceID, targetID string) *rag.Relationship {
 }
 
 // parseFalkorDBProperties parses FalkorDB property format: [[id, len, str], [id, len, str], ...]
-func parseFalkorDBProperties(props []interface{}, e *rag.Entity) {
+func parseFalkorDBProperties(props []any, e *rag.Entity) {
 	for i := 0; i < len(props)-1; i += 2 {
 		if i+1 < len(props) {
 			// Key
@@ -561,10 +558,10 @@ func parseFalkorDBProperties(props []interface{}, e *rag.Entity) {
 }
 
 // extractStringFromFalkorDBFormat extracts string from format [id, len, str]
-func extractStringFromFalkorDBFormat(item interface{}) string {
+func extractStringFromFalkorDBFormat(item any) string {
 	// Handle different possible formats
 	switch v := item.(type) {
-	case []interface{}:
+	case []any:
 		if len(v) >= 3 {
 			// Format: [id, length, string]
 			if str, ok := v[2].(string); ok {

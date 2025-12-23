@@ -3,6 +3,7 @@ package rag
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -48,9 +49,7 @@ func (l *LangChainDocumentLoader) LoadWithMetadata(ctx context.Context, metadata
 			if docs[i].Metadata == nil {
 				docs[i].Metadata = make(map[string]any)
 			}
-			for k, v := range metadata {
-				docs[i].Metadata[k] = v
-			}
+			maps.Copy(docs[i].Metadata, metadata)
 		}
 	}
 
@@ -70,8 +69,8 @@ func (l *LangChainDocumentLoader) LoadAndSplit(ctx context.Context, splitter tex
 	var splitDocs []schema.Document
 	for _, doc := range schemaDocs {
 		// Simple split by paragraphs for now
-		paragraphs := strings.Split(doc.PageContent, "\n\n")
-		for _, para := range paragraphs {
+		paragraphs := strings.SplitSeq(doc.PageContent, "\n\n")
+		for para := range paragraphs {
 			if strings.TrimSpace(para) != "" {
 				splitDocs = append(splitDocs, schema.Document{
 					PageContent: strings.TrimSpace(para),
@@ -105,9 +104,7 @@ func convertSchemaDocuments(schemaDocs []schema.Document) []Document {
 // convertSchemaMetadata converts langchaingo metadata to our format
 func convertSchemaMetadata(metadata map[string]any) map[string]any {
 	result := make(map[string]any)
-	for k, v := range metadata {
-		result[k] = v
-	}
+	maps.Copy(result, metadata)
 	return result
 }
 
@@ -141,8 +138,8 @@ func (l *LangChainTextSplitter) SplitDocuments(docs []Document) []Document {
 	var result []Document
 	for _, doc := range docs {
 		// Simple split by paragraphs
-		paragraphs := strings.Split(doc.Content, "\n\n")
-		for _, para := range paragraphs {
+		paragraphs := strings.SplitSeq(doc.Content, "\n\n")
+		for para := range paragraphs {
 			if strings.TrimSpace(para) != "" {
 				newDoc := Document{
 					Content:  strings.TrimSpace(para),
@@ -158,14 +155,14 @@ func (l *LangChainTextSplitter) SplitDocuments(docs []Document) []Document {
 // JoinText joins text chunks back together
 func (l *LangChainTextSplitter) JoinText(chunks []string) string {
 	// Simple implementation
-	result := ""
+	var result strings.Builder
 	for i, chunk := range chunks {
 		if i > 0 {
-			result += " "
+			result.WriteString(" ")
 		}
-		result += chunk
+		result.WriteString(chunk)
 	}
-	return result
+	return result.String()
 }
 
 // LangChainEmbedder adapts langchaingo's embeddings.Embedder to our Embedder interface

@@ -86,7 +86,7 @@ func (s *InMemoryVectorStore) Search(ctx context.Context, queryEmbedding []float
 	}
 
 	// Sort by similarity score (descending)
-	for i := 0; i < len(scores); i++ {
+	for i := range scores {
 		for j := i + 1; j < len(scores); j++ {
 			if scores[j].score > scores[i].score {
 				scores[i], scores[j] = scores[j], scores[i]
@@ -143,7 +143,7 @@ func (s *InMemoryVectorStore) SearchWithFilter(ctx context.Context, queryEmbeddi
 	}
 
 	// Sort by similarity score (descending)
-	for i := 0; i < len(scores); i++ {
+	for i := range scores {
 		for j := i + 1; j < len(scores); j++ {
 			if scores[j].score > scores[i].score {
 				scores[i], scores[j] = scores[j], scores[i]
@@ -275,7 +275,7 @@ func cosineSimilarity32(a, b []float32) float64 {
 	var normA float64
 	var normB float64
 
-	for i := 0; i < len(a); i++ {
+	for i := range a {
 		dotProduct += float64(a[i] * b[i])
 		normA += float64(a[i] * a[i])
 		normB += float64(b[i] * b[i])

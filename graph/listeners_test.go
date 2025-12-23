@@ -477,8 +477,7 @@ func BenchmarkListenableNode_Execute(b *testing.B) {
 
 	ctx := context.Background()
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = listenableNode.Execute(ctx, "test")
 	}
 }
@@ -503,8 +502,7 @@ func BenchmarkListenableRunnable_Invoke(b *testing.B) {
 	runnable, _ := g.CompileListenable()
 	ctx := context.Background()
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = runnable.Invoke(ctx, "test")
 	}
 }

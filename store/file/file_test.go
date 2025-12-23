@@ -75,7 +75,7 @@ func TestFileCheckpointStore_SaveAndLoad(t *testing.T) {
 			State:     "authenticated",
 			Timestamp: now,
 			Version:   1,
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"user_id": "john.doe@example.com",
 				"ip":      "192.168.1.100",
 			},
@@ -107,7 +107,7 @@ func TestFileCheckpointStore_SaveAndLoad(t *testing.T) {
 			State:     "authenticated",
 			Timestamp: now,
 			Version:   1,
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"user_id": "john.doe@example.com",
 				"ip":      "192.168.1.100",
 			},
@@ -153,7 +153,7 @@ func TestFileCheckpointStore_SaveAndLoad(t *testing.T) {
 		complexCP := &store.Checkpoint{
 			ID:       "order-flow-456",
 			NodeName: "payment-processor",
-			State: map[string]interface{}{
+			State: map[string]any{
 				"order_id":     789,
 				"items":        []string{"widget", "gadget"},
 				"total_amount": 99.99,
@@ -161,7 +161,7 @@ func TestFileCheckpointStore_SaveAndLoad(t *testing.T) {
 			},
 			Timestamp: now,
 			Version:   3,
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"session_id": "sess-xyz-789",
 			},
 		}
@@ -177,7 +177,7 @@ func TestFileCheckpointStore_SaveAndLoad(t *testing.T) {
 		}
 
 		// Verify complex state
-		state, ok := loaded.State.(map[string]interface{})
+		state, ok := loaded.State.(map[string]any)
 		if !ok {
 			t.Fatal("State should be a map")
 		}
@@ -233,7 +233,7 @@ func TestFileCheckpointStore_List(t *testing.T) {
 				State:     "processing",
 				Timestamp: time.Now(),
 				Version:   cp.version,
-				Metadata: map[string]interface{}{
+				Metadata: map[string]any{
 					"session_id": sessionID,
 				},
 			}
@@ -275,7 +275,7 @@ func TestFileCheckpointStore_List(t *testing.T) {
 			State:     "processing",
 			Timestamp: time.Now(),
 			Version:   1,
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"thread_id": threadID,
 			},
 		}
@@ -417,7 +417,7 @@ func TestFileCheckpointStore_Clear(t *testing.T) {
 			State:     "running",
 			Timestamp: time.Now(),
 			Version:   cp.version,
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"session_id": cp.session,
 			},
 		}
@@ -514,16 +514,16 @@ func TestFileCheckpointStore_Concurrent(t *testing.T) {
 	errs := make(chan error, numWorkers)
 
 	// Launch workers
-	for i := 0; i < numWorkers; i++ {
+	for i := range numWorkers {
 		go func(workerID int) {
 			defer func() { done <- true }()
 
-			for j := 0; j < checkpointsPerWorker; j++ {
+			for j := range checkpointsPerWorker {
 				cp := &store.Checkpoint{
 					ID:       fmt.Sprintf("worker-%d-checkpoint-%d", workerID, j),
 					NodeName: fmt.Sprintf("worker-%d-processor", workerID),
 					State:    fmt.Sprintf("state-%d", j),
-					Metadata: map[string]interface{}{
+					Metadata: map[string]any{
 						"worker_id": workerID,
 						"step":      j,
 					},
@@ -553,7 +553,7 @@ func TestFileCheckpointStore_Concurrent(t *testing.T) {
 	}
 
 	// Wait for workers
-	for i := 0; i < numWorkers; i++ {
+	for range numWorkers {
 		select {
 		case <-done:
 			// Worker completed

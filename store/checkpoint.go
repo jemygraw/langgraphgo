@@ -7,12 +7,12 @@ import (
 
 // Checkpoint represents a saved state at a specific point in execution
 type Checkpoint struct {
-	ID        string                 `json:"id"`
-	NodeName  string                 `json:"node_name"`
-	State     interface{}            `json:"state"`
-	Metadata  map[string]interface{} `json:"metadata"`
-	Timestamp time.Time              `json:"timestamp"`
-	Version   int                    `json:"version"`
+	ID        string         `json:"id"`
+	NodeName  string         `json:"node_name"`
+	State     any            `json:"state"`
+	Metadata  map[string]any `json:"metadata"`
+	Timestamp time.Time      `json:"timestamp"`
+	Version   int            `json:"version"`
 }
 
 // CheckpointStore defines the interface for checkpoint persistence

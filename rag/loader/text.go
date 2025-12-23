@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"strings"
 
@@ -32,9 +33,7 @@ func WithEncoding(encoding string) TextLoaderOption {
 // WithMetadata sets additional metadata for loaded documents
 func WithMetadata(metadata map[string]any) TextLoaderOption {
 	return func(l *TextLoader) {
-		for k, v := range metadata {
-			l.metadata[k] = v
-		}
+		maps.Copy(l.metadata, metadata)
 	}
 }
 
@@ -74,12 +73,8 @@ func (l *TextLoader) Load(ctx context.Context) ([]rag.Document, error) {
 func (l *TextLoader) LoadWithMetadata(ctx context.Context, metadata map[string]any) ([]rag.Document, error) {
 	// Combine default metadata with provided metadata
 	combinedMetadata := make(map[string]any)
-	for k, v := range l.metadata {
-		combinedMetadata[k] = v
-	}
-	for k, v := range metadata {
-		combinedMetadata[k] = v
-	}
+	maps.Copy(combinedMetadata, l.metadata)
+	maps.Copy(combinedMetadata, metadata)
 
 	// Open the file
 	file, err := os.Open(l.filePath)
@@ -139,12 +134,8 @@ func (l *TextByLinesLoader) Load(ctx context.Context) ([]rag.Document, error) {
 func (l *TextByLinesLoader) LoadWithMetadata(ctx context.Context, metadata map[string]any) ([]rag.Document, error) {
 	// Combine metadata
 	combinedMetadata := make(map[string]any)
-	for k, v := range l.metadata {
-		combinedMetadata[k] = v
-	}
-	for k, v := range metadata {
-		combinedMetadata[k] = v
-	}
+	maps.Copy(combinedMetadata, l.metadata)
+	maps.Copy(combinedMetadata, metadata)
 
 	// Open the file
 	file, err := os.Open(l.filePath)
@@ -165,9 +156,7 @@ func (l *TextByLinesLoader) LoadWithMetadata(ctx context.Context, metadata map[s
 		}
 
 		lineMetadata := make(map[string]any)
-		for k, v := range combinedMetadata {
-			lineMetadata[k] = v
-		}
+		maps.Copy(lineMetadata, combinedMetadata)
 		lineMetadata["line_number"] = lineNumber
 
 		doc := rag.Document{
@@ -231,12 +220,8 @@ func (l *TextByParagraphsLoader) Load(ctx context.Context) ([]rag.Document, erro
 func (l *TextByParagraphsLoader) LoadWithMetadata(ctx context.Context, metadata map[string]any) ([]rag.Document, error) {
 	// Combine metadata
 	combinedMetadata := make(map[string]any)
-	for k, v := range l.metadata {
-		combinedMetadata[k] = v
-	}
-	for k, v := range metadata {
-		combinedMetadata[k] = v
-	}
+	maps.Copy(combinedMetadata, l.metadata)
+	maps.Copy(combinedMetadata, metadata)
 
 	// Read the entire file content
 	content, err := os.ReadFile(l.filePath)
@@ -255,9 +240,7 @@ func (l *TextByParagraphsLoader) LoadWithMetadata(ctx context.Context, metadata 
 		}
 
 		paragraphMetadata := make(map[string]any)
-		for k, v := range combinedMetadata {
-			paragraphMetadata[k] = v
-		}
+		maps.Copy(paragraphMetadata, combinedMetadata)
 		paragraphMetadata["paragraph_number"] = i
 
 		doc := rag.Document{
@@ -316,12 +299,8 @@ func (l *TextByChaptersLoader) Load(ctx context.Context) ([]rag.Document, error)
 func (l *TextByChaptersLoader) LoadWithMetadata(ctx context.Context, metadata map[string]any) ([]rag.Document, error) {
 	// Combine metadata
 	combinedMetadata := make(map[string]any)
-	for k, v := range l.metadata {
-		combinedMetadata[k] = v
-	}
-	for k, v := range metadata {
-		combinedMetadata[k] = v
-	}
+	maps.Copy(combinedMetadata, l.metadata)
+	maps.Copy(combinedMetadata, metadata)
 
 	// Read the entire file content
 	content, err := os.ReadFile(l.filePath)
@@ -346,9 +325,7 @@ func (l *TextByChaptersLoader) LoadWithMetadata(ctx context.Context, metadata ma
 				chapterContent := strings.TrimSpace(currentChapter.String())
 				if chapterContent != "" {
 					chapterMetadata := make(map[string]any)
-					for k, v := range combinedMetadata {
-						chapterMetadata[k] = v
-					}
+					maps.Copy(chapterMetadata, combinedMetadata)
 					chapterMetadata["chapter_number"] = chapterNumber
 					chapterMetadata["chapter_title"] = chapterTitle
 
@@ -377,9 +354,7 @@ func (l *TextByChaptersLoader) LoadWithMetadata(ctx context.Context, metadata ma
 		chapterContent := strings.TrimSpace(currentChapter.String())
 		if chapterContent != "" {
 			chapterMetadata := make(map[string]any)
-			for k, v := range combinedMetadata {
-				chapterMetadata[k] = v
-			}
+			maps.Copy(chapterMetadata, combinedMetadata)
 			chapterMetadata["chapter_number"] = chapterNumber
 			chapterMetadata["chapter_title"] = chapterTitle
 

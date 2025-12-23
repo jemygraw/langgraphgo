@@ -302,7 +302,7 @@ func TestCompressionMemory(t *testing.T) {
 	})
 
 	// Add messages to trigger compression
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		msg := NewMessage("user", "Message content for compression")
 		if err := mem.AddMessage(ctx, msg); err != nil {
 			t.Fatalf("Failed to add message: %v", err)
@@ -339,7 +339,7 @@ func TestOSLikeMemory(t *testing.T) {
 	})
 
 	// Add messages
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		msg := NewMessage("user", "Message content")
 		if err := mem.AddMessage(ctx, msg); err != nil {
 			t.Fatalf("Failed to add message: %v", err)

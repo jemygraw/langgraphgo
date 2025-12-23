@@ -2,6 +2,7 @@ package prebuilt
 
 import (
 	"context"
+	"maps"
 	"strings"
 	"testing"
 
@@ -745,9 +746,7 @@ func TestRouteAfterVerifier(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a copy of state for mutable operations
 			stateCopy := make(map[string]any)
-			for k, v := range tt.state {
-				stateCopy[k] = v
-			}
+			maps.Copy(stateCopy, tt.state)
 
 			route := routeAfterVerifier(stateCopy, tt.maxRetries, tt.verbose)
 			if route != tt.expectedRoute {

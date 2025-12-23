@@ -3,6 +3,7 @@ package rag
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -125,9 +126,7 @@ func (s *ragStateSchema) Update(current, new any) (any, error) {
 		if currState.Metadata == nil {
 			currState.Metadata = make(map[string]any)
 		}
-		for k, v := range newState.Metadata {
-			currState.Metadata[k] = v
-		}
+		maps.Copy(currState.Metadata, newState.Metadata)
 	}
 
 	return currState, nil

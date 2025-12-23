@@ -2,6 +2,7 @@ package loader
 
 import (
 	"context"
+	"maps"
 
 	"github.com/smallnest/langgraphgo/rag"
 )
@@ -36,9 +37,7 @@ func (l *StaticDocumentLoader) LoadWithMetadata(ctx context.Context, metadata ma
 		if newDoc.Metadata == nil {
 			newDoc.Metadata = make(map[string]any)
 		}
-		for k, v := range metadata {
-			newDoc.Metadata[k] = v
-		}
+		maps.Copy(newDoc.Metadata, metadata)
 		docs[i] = newDoc
 	}
 

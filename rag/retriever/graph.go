@@ -227,40 +227,42 @@ func (r *GraphRetriever) graphResultsToSearchResults(graphResult *rag.GraphQuery
 
 // entityToDocumentContent converts an entity to document content
 func (r *GraphRetriever) entityToDocumentContent(entity *rag.Entity) string {
-	content := fmt.Sprintf("Entity: %s\nType: %s\n", entity.Name, entity.Type)
+	var content strings.Builder
+	content.WriteString(fmt.Sprintf("Entity: %s\nType: %s\n", entity.Name, entity.Type))
 
 	if entity.Properties != nil {
 		if description, ok := entity.Properties["description"]; ok {
-			content += fmt.Sprintf("Description: %v\n", description)
+			content.WriteString(fmt.Sprintf("Description: %v\n", description))
 		}
 
 		// Add other relevant properties
 		for key, value := range entity.Properties {
 			if key != "description" {
-				content += fmt.Sprintf("%s: %v\n", key, value)
+				content.WriteString(fmt.Sprintf("%s: %v\n", key, value))
 			}
 		}
 	}
 
-	return content
+	return content.String()
 }
 
 // relationshipToDocumentContent converts a relationship to document content
 func (r *GraphRetriever) relationshipToDocumentContent(relationship *rag.Relationship) string {
-	content := fmt.Sprintf("Relationship: %s -> %s\nType: %s\n",
-		relationship.Source, relationship.Target, relationship.Type)
+	var content strings.Builder
+	content.WriteString(fmt.Sprintf("Relationship: %s -> %s\nType: %s\n",
+		relationship.Source, relationship.Target, relationship.Type))
 
 	if relationship.Confidence > 0 {
-		content += fmt.Sprintf("Confidence: %.2f\n", relationship.Confidence)
+		content.WriteString(fmt.Sprintf("Confidence: %.2f\n", relationship.Confidence))
 	}
 
 	if relationship.Properties != nil {
 		for key, value := range relationship.Properties {
-			content += fmt.Sprintf("%s: %v\n", key, value)
+			content.WriteString(fmt.Sprintf("%s: %v\n", key, value))
 		}
 	}
 
-	return content
+	return content.String()
 }
 
 // calculateEntityScore calculates relevance score for an entity

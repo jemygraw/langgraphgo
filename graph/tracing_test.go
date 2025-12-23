@@ -328,8 +328,7 @@ func BenchmarkTracer_StartEndSpan(b *testing.B) {
 	tracer := graph.NewTracer()
 	ctx := context.Background()
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		span := tracer.StartSpan(ctx, graph.TraceEventNodeStart, "benchmark_node")
 		tracer.EndSpan(ctx, span, "state", nil)
 	}
@@ -350,8 +349,7 @@ func BenchmarkTracedRunnable_Invoke(b *testing.B) {
 
 	ctx := context.Background()
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = tracedRunnable.Invoke(ctx, "test")
 		tracer.Clear() // Clear spans to avoid memory buildup
 	}
