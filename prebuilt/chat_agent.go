@@ -14,7 +14,7 @@ import (
 // ChatAgent represents a session with a user and can handle multi-turn conversations.
 type ChatAgent struct {
 	// The underlying agent runnable
-	Runnable *graph.StateRunnable
+	Runnable *graph.StateRunnable[map[string]any]
 	// The session ID for this conversation
 	threadID string
 	// Conversation history
@@ -91,12 +91,8 @@ func (c *ChatAgent) Chat(ctx context.Context, message string) (string, error) {
 	}
 
 	// 5. Extract messages from response
-	mState, ok := resp.(map[string]any)
-	if !ok {
-		return "", fmt.Errorf("invalid response type: %T", resp)
-	}
-
-	messages, ok := mState["messages"].([]llms.MessageContent)
+	// resp is already map[string]any from StateRunnable[map[string]any]
+	messages, ok := resp["messages"].([]llms.MessageContent)
 	if !ok || len(messages) == 0 {
 		return "", fmt.Errorf("no messages in response")
 	}

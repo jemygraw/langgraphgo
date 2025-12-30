@@ -73,26 +73,119 @@ type Edge struct {
 // StateMerger merges multiple state updates into a single state.
 type StateMerger func(ctx context.Context, currentState any, newStates []any) (any, error)
 
-// Runnable is an alias for StateRunnable for backward compatibility.
-// All Runnable functionality is now provided by StateRunnable.
-type Runnable = StateRunnable
+// RetryPolicy defines how to handle node failures
+type RetryPolicy struct {
+	MaxRetries      int
+	BackoffStrategy BackoffStrategy
+	RetryableErrors []string
+}
 
-// NewMessageGraph creates a new instance of StateGraph with a default schema
+// BackoffStrategy defines different backoff strategies
+type BackoffStrategy int
+
+const (
+	FixedBackoff BackoffStrategy = iota
+	ExponentialBackoff
+	LinearBackoff
+)
+
+// Runnable is an alias for StateRunnable[map[string]any] for convenience.
+type Runnable = StateRunnable[map[string]any]
+
+// StateGraphMap is an alias for StateGraph[map[string]any] for convenience.
+// Use NewStateGraph[map[string]any]() or NewStateGraph[S]() for other types.
+type StateGraphMap = StateGraph[map[string]any]
+
+// ListenableStateGraphMap is an alias for ListenableStateGraphTyped[map[string]any].
+type ListenableStateGraphMap = ListenableStateGraphTyped[map[string]any]
+
+// ListenableRunnableMap is an alias for ListenableRunnableTyped[map[string]any].
+type ListenableRunnableMap = ListenableRunnableTyped[map[string]any]
+
+// StateGraphUntyped is a wrapper around StateGraph[map[string]any] with convenience methods for untyped functions.
+// Deprecated: Use StateGraph[S] or StateGraphMap directly
+type StateGraphUntyped struct {
+	*StateGraphMap
+}
+
+// NewStateGraphUntyped creates a new StateGraph with map[string]any state type
+// Deprecated: Use NewStateGraph[map[string]any]() or NewStateGraph[S]() instead
+func NewStateGraphUntyped() *StateGraphUntyped {
+	return &StateGraphUntyped{
+		StateGraphMap: NewStateGraph[map[string]any](),
+	}
+}
+
+// ListenableStateGraphUntyped is a wrapper around ListenableStateGraphTyped[map[string]any] with convenience methods.
+// Deprecated: Use ListenableStateGraphTyped[S] or ListenableStateGraphMap directly
+type ListenableStateGraphUntyped struct {
+	*ListenableStateGraphMap
+}
+
+// NewListenableStateGraphUntyped creates a new listenable state graph
+// Deprecated: Use NewListenableStateGraphTyped[map[string]any]() instead
+func NewListenableStateGraphUntyped() *ListenableStateGraphUntyped {
+	return &ListenableStateGraphUntyped{
+		ListenableStateGraphMap: NewListenableStateGraphTyped[map[string]any](),
+	}
+}
+
+// StateRunnableUntyped is an alias for Runnable
+// Deprecated: Use StateRunnable[S] or Runnable directly
+type StateRunnableUntyped = Runnable
+
+// ListenableRunnable is an alias for ListenableRunnableMap
+// Deprecated: Use ListenableRunnableTyped[S] or ListenableRunnableMap directly
+type ListenableRunnable = ListenableRunnableMap
+
+// MapSchemaAdapter adapts a MapSchema to StateSchemaTyped[map[string]any]
+type MapSchemaAdapter struct {
+	Schema *MapSchema
+}
+
+// Init returns the initial state
+func (a *MapSchemaAdapter) Init() map[string]any {
+	result := a.Schema.Init()
+	if result == nil {
+		return make(map[string]any)
+	}
+	if m, ok := result.(map[string]any); ok {
+		return m
+	}
+	return make(map[string]any)
+}
+
+// Update merges the new state into the current state
+func (a *MapSchemaAdapter) Update(current, new map[string]any) (map[string]any, error) {
+	result, err := a.Schema.Update(current, new)
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return make(map[string]any), nil
+	}
+	if m, ok := result.(map[string]any); ok {
+		return m, nil
+	}
+	return current, nil
+}
+
+// NewMessageGraph creates a new instance of StateGraph[map[string]any] with a default schema
 // that handles "messages" using the AddMessages reducer.
 // This is the recommended constructor for chat-based agents that use
 // map[string]any as state with a "messages" key.
 //
-// This replaces the old NewMessageGraphWithSchema() function.
-func NewMessageGraph() *StateGraph {
-	g := &StateGraph{
-		nodes:            make(map[string]Node),
-		conditionalEdges: make(map[string]func(ctx context.Context, state any) string),
-	}
+// Deprecated: Use NewStateGraph[MessageState]() for type-safe state management.
+func NewMessageGraph() *StateGraph[map[string]any] {
+	g := NewStateGraph[map[string]any]()
 
 	// Initialize default schema for message handling
 	schema := NewMapSchema()
 	schema.RegisterReducer("messages", AddMessages)
-	g.Schema = schema
+
+	// Wrap in adapter to match StateSchemaTyped[map[string]any]
+	adapter := &MapSchemaAdapter{Schema: schema}
+	g.SetSchema(adapter)
 
 	return g
 }

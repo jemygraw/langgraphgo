@@ -7,13 +7,13 @@ import (
 )
 
 // Exporter provides methods to export graphs in different formats
-type Exporter struct {
-	graph *StateGraph
+type Exporter[S any] struct {
+	graph *StateGraph[S]
 }
 
 // NewExporter creates a new graph exporter for the given graph
-func NewExporter(graph *StateGraph) *Exporter {
-	return &Exporter{graph: graph}
+func NewExporter[S any](graph *StateGraph[S]) *Exporter[S] {
+	return &Exporter[S]{graph: graph}
 }
 
 // MermaidOptions defines configuration for Mermaid diagram generation
@@ -23,14 +23,14 @@ type MermaidOptions struct {
 }
 
 // DrawMermaid generates a Mermaid diagram representation of the graph
-func (ge *Exporter) DrawMermaid() string {
+func (ge *Exporter[S]) DrawMermaid() string {
 	return ge.DrawMermaidWithOptions(MermaidOptions{
 		Direction: "TD",
 	})
 }
 
 // DrawMermaidWithOptions generates a Mermaid diagram with custom options
-func (ge *Exporter) DrawMermaidWithOptions(opts MermaidOptions) string {
+func (ge *Exporter[S]) DrawMermaidWithOptions(opts MermaidOptions) string {
 	var sb strings.Builder
 
 	// Start Mermaid flowchart
@@ -96,7 +96,7 @@ func (ge *Exporter) DrawMermaidWithOptions(opts MermaidOptions) string {
 }
 
 // DrawDOT generates a DOT (Graphviz) representation of the graph
-func (ge *Exporter) DrawDOT() string {
+func (ge *Exporter[S]) DrawDOT() string {
 	var sb strings.Builder
 
 	sb.WriteString("digraph G {\n")
@@ -143,7 +143,7 @@ func (ge *Exporter) DrawDOT() string {
 }
 
 // DrawASCII generates an ASCII tree representation of the graph
-func (ge *Exporter) DrawASCII() string {
+func (ge *Exporter[S]) DrawASCII() string {
 	if ge.graph.entryPoint == "" {
 		return "No entry point set\n"
 	}
@@ -160,7 +160,7 @@ func (ge *Exporter) DrawASCII() string {
 }
 
 // drawASCIINode recursively draws ASCII representation of nodes
-func (ge *Exporter) drawASCIINode(nodeName string, prefix string, isLast bool, visited map[string]bool, sb *strings.Builder) {
+func (ge *Exporter[S]) drawASCIINode(nodeName string, prefix string, isLast bool, visited map[string]bool, sb *strings.Builder) {
 	if visited[nodeName] {
 		// Handle cycles
 		connector := "├──"
@@ -219,7 +219,7 @@ func (ge *Exporter) drawASCIINode(nodeName string, prefix string, isLast bool, v
 	}
 }
 
-// GetGraph returns a Exporter for the compiled graph's visualization
-func (r *Runnable) GetGraph() *Exporter {
-	return NewExporter(r.graph)
+// GetGraphForRunnable returns a Exporter for the compiled graph's visualization
+func GetGraphForRunnable(r *Runnable) *Exporter[map[string]any] {
+	return NewExporter[map[string]any](r.graph)
 }

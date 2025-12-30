@@ -25,14 +25,14 @@ type State struct {
 }
 
 // NewGraph creates and configures the research agent graph.
-func NewGraph() (*graph.StateRunnable, error) {
-	workflow := graph.NewStateGraph()
+func NewGraph() (*graph.StateRunnable[*State], error) {
+	workflow := graph.NewStateGraph[*State]()
 
-	// Add nodes
-	workflow.AddNode("planner", "Research planning node", PlannerNode)
-	workflow.AddNode("researcher", "Research execution node", ResearcherNode)
-	workflow.AddNode("reporter", "Report generation node", ReporterNode)
-	workflow.AddNode("podcast", "Podcast script generation node", PodcastNode)
+	// Add nodes with typed functions
+	workflow.AddNode("planner", "Research planning node", PlannerNodeTyped)
+	workflow.AddNode("researcher", "Research execution node", ResearcherNodeTyped)
+	workflow.AddNode("reporter", "Report generation node", ReporterNodeTyped)
+	workflow.AddNode("podcast", "Podcast script generation node", PodcastNodeTyped)
 
 	// Add edges
 	// Start -> Planner
@@ -45,9 +45,8 @@ func NewGraph() (*graph.StateRunnable, error) {
 	workflow.AddEdge("researcher", "reporter")
 
 	// Reporter -> Podcast (Conditional) or END
-	workflow.AddConditionalEdge("reporter", func(ctx context.Context, state any) string {
-		s := state.(*State)
-		if s.GeneratePodcast {
+	workflow.AddConditionalEdge("reporter", func(ctx context.Context, state *State) string {
+		if state.GeneratePodcast {
 			return "podcast"
 		}
 		return graph.END

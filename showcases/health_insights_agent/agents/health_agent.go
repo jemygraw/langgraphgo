@@ -54,7 +54,7 @@ func NewHealthAnalysisAgent(apiKey, baseURL string, config *AgentConfig, verbose
 }
 
 // CreateAnalysisGraph 创建分析工作流图
-func (a *HealthAnalysisAgent) CreateAnalysisGraph() (*graph.StateRunnable, error) {
+func (a *HealthAnalysisAgent) CreateAnalysisGraph() (*graph.StateRunnableUntyped error) {
 	workflow := graph.NewStateGraph()
 
 	// 定义状态schema

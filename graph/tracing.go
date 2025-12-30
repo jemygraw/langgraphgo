@@ -207,12 +207,14 @@ func generateSpanID() string {
 }
 
 // TracedRunnable wraps a Runnable with tracing capabilities
+// Deprecated: Use StateTracedRunnable[S] for type-safe tracing
 type TracedRunnable struct {
 	*Runnable
 	tracer *Tracer
 }
 
 // NewTracedRunnable creates a new traced runnable
+// Deprecated: Use NewStateTracedRunnable[S] for type-safe tracing
 func NewTracedRunnable(runnable *Runnable, tracer *Tracer) *TracedRunnable {
 	return &TracedRunnable{
 		Runnable: runnable,
@@ -226,7 +228,15 @@ func (tr *TracedRunnable) Invoke(ctx context.Context, initialState any) (any, er
 	graphSpan := tr.tracer.StartSpan(ctx, TraceEventGraphStart, "")
 	ctx = ContextWithSpan(ctx, graphSpan)
 
-	state := initialState
+	// Convert initialState to map[string]any if needed
+	var stateMap map[string]any
+	if sm, ok := initialState.(map[string]any); ok {
+		stateMap = sm
+	} else {
+		stateMap = map[string]any{"state": initialState}
+	}
+
+	state := any(stateMap)
 	currentNode := tr.graph.entryPoint
 	var finalError error
 
@@ -235,6 +245,7 @@ func (tr *TracedRunnable) Invoke(ctx context.Context, initialState any) (any, er
 			break
 		}
 
+		// Get typed node from the graph
 		node, ok := tr.graph.nodes[currentNode]
 		if !ok {
 			finalError = ErrNodeNotFound
@@ -247,7 +258,14 @@ func (tr *TracedRunnable) Invoke(ctx context.Context, initialState any) (any, er
 		nodeCtx := ContextWithSpan(ctx, nodeSpan)
 
 		var err error
-		state, err = node.Function(nodeCtx, state)
+		// Call the typed function with map[string]any
+		var currentState map[string]any
+		if s, ok := state.(map[string]any); ok {
+			currentState = s
+		} else {
+			currentState = map[string]any{"state": state}
+		}
+		state, err = node.Function(nodeCtx, currentState)
 
 		// End node execution span
 		tr.tracer.EndSpan(nodeCtx, nodeSpan, state, err)
@@ -282,5 +300,39 @@ func (tr *TracedRunnable) Invoke(ctx context.Context, initialState any) (any, er
 
 // GetTracer returns the tracer instance
 func (tr *TracedRunnable) GetTracer() *Tracer {
+	return tr.tracer
+}
+
+// StateTracedRunnable[S] wraps a StateRunnable[S] with tracing capabilities
+type StateTracedRunnable[S any] struct {
+	runnable *StateRunnable[S]
+	tracer   *Tracer
+}
+
+// NewStateTracedRunnable creates a new generic traced runnable
+func NewStateTracedRunnable[S any](runnable *StateRunnable[S], tracer *Tracer) *StateTracedRunnable[S] {
+	return &StateTracedRunnable[S]{
+		runnable: runnable,
+		tracer:   tracer,
+	}
+}
+
+// Invoke executes the graph with tracing enabled
+func (tr *StateTracedRunnable[S]) Invoke(ctx context.Context, initialState S) (S, error) {
+	// Start graph execution span
+	graphSpan := tr.tracer.StartSpan(ctx, TraceEventGraphStart, "")
+	ctx = ContextWithSpan(ctx, graphSpan)
+
+	// Execute the graph
+	result, err := tr.runnable.Invoke(ctx, initialState)
+
+	// End graph execution span
+	tr.tracer.EndSpan(ctx, graphSpan, result, err)
+
+	return result, err
+}
+
+// GetTracer returns the tracer instance
+func (tr *StateTracedRunnable[S]) GetTracer() *Tracer {
 	return tr.tracer
 }

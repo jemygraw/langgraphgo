@@ -16,7 +16,7 @@
 // Edges define the flow between nodes, supporting conditional routing based on state content.
 //
 // Typed Support
-// For type safety, the package provides StateGraphTyped[S] which uses Go generics to enforce
+// For type safety, the package provides StateGraph[S] which uses Go generics to enforce
 // state types at compile time, reducing runtime errors and improving code maintainability.
 //
 // # Key Features
@@ -72,7 +72,7 @@
 //		Complete bool   `json:"complete"`
 //	}
 //
-//	g := graph.NewStateGraphTyped[WorkflowState]()
+//	g := graph.NewStateGraph[WorkflowState]()
 //
 //	g.AddNode("process", "Process the input", func(ctx context.Context, state WorkflowState) (WorkflowState, error) {
 //		state.Output = strings.ToUpper(state.Input)

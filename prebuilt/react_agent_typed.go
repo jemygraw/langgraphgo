@@ -17,7 +17,7 @@ type ReactAgentState struct {
 }
 
 // CreateReactAgentTyped creates a new typed ReAct agent graph
-func CreateReactAgentTyped(model llms.Model, inputTools []tools.Tool, maxIterations int) (*graph.StateRunnableTyped[ReactAgentState], error) {
+func CreateReactAgentTyped(model llms.Model, inputTools []tools.Tool, maxIterations int) (*graph.StateRunnable[ReactAgentState], error) {
 	if maxIterations == 0 {
 		maxIterations = 20
 	}
@@ -25,7 +25,7 @@ func CreateReactAgentTyped(model llms.Model, inputTools []tools.Tool, maxIterati
 	toolExecutor := NewToolExecutor(inputTools)
 
 	// Define the graph
-	workflow := graph.NewStateGraphTyped[ReactAgentState]()
+	workflow := graph.NewStateGraph[ReactAgentState]()
 
 	// Define the state schema
 	schema := graph.NewStructSchema(
@@ -219,7 +219,7 @@ func CreateReactAgentWithCustomStateTyped[S any](
 	setIterationCount func(S, int) S,
 	hasToolCalls func([]llms.MessageContent) bool,
 	maxIterations int,
-) (*graph.StateRunnableTyped[S], error) {
+) (*graph.StateRunnable[S], error) {
 	if maxIterations == 0 {
 		maxIterations = 20
 	}
@@ -227,7 +227,7 @@ func CreateReactAgentWithCustomStateTyped[S any](
 	toolExecutor := NewToolExecutor(inputTools)
 
 	// Define the graph
-	workflow := graph.NewStateGraphTyped[S]()
+	workflow := graph.NewStateGraph[S]()
 
 	// Define the agent node
 	workflow.AddNode("agent", "ReAct agent decision maker", func(ctx context.Context, state S) (S, error) {

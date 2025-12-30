@@ -75,8 +75,8 @@ func (a *TypedMockAgent) Invoke(ctx context.Context, state SupervisorState) (Sup
 	}, nil
 }
 
-func (a *TypedMockAgent) Compile() (*graph.StateRunnableTyped[SupervisorState], error) {
-	workflow := graph.NewStateGraphTyped[SupervisorState]()
+func (a *TypedMockAgent) Compile() (*graph.StateRunnable[SupervisorState], error) {
+	workflow := graph.NewStateGraph[SupervisorState]()
 
 	// Define state schema
 	schema := graph.NewStructSchema(
@@ -142,7 +142,7 @@ func TestCreateSupervisorTyped(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create Supervisor
-	members := map[string]*graph.StateRunnableTyped[SupervisorState]{
+	members := map[string]*graph.StateRunnable[SupervisorState]{
 		"Agent1": agent1Runnable,
 	}
 	supervisor, err := CreateSupervisorTyped(mockLLM, members)
@@ -217,7 +217,7 @@ func TestCreateSupervisorTyped_SingleAgent(t *testing.T) {
 	agentRunnable, err := agent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnableTyped[SupervisorState]{
+	members := map[string]*graph.StateRunnable[SupervisorState]{
 		"Worker": agentRunnable,
 	}
 	supervisor, err := CreateSupervisorTyped(mockLLM, members)
@@ -272,7 +272,7 @@ func TestCreateSupervisorTyped_DirectFinish(t *testing.T) {
 	agentRunnable, err := agent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnableTyped[SupervisorState]{
+	members := map[string]*graph.StateRunnable[SupervisorState]{
 		"Agent": agentRunnable,
 	}
 	supervisor, err := CreateSupervisorTyped(mockLLM, members)
@@ -318,7 +318,7 @@ func TestCreateSupervisorTyped_AgentError(t *testing.T) {
 	errorAgentRunnable, err := errorAgent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnableTyped[SupervisorState]{
+	members := map[string]*graph.StateRunnable[SupervisorState]{
 		"ErrorAgent": errorAgentRunnable,
 	}
 	supervisor, err := CreateSupervisorTyped(mockLLM, members)
@@ -354,7 +354,7 @@ func TestCreateSupervisorTyped_NoToolCall(t *testing.T) {
 	agentRunnable, err := agent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnableTyped[SupervisorState]{
+	members := map[string]*graph.StateRunnable[SupervisorState]{
 		"Agent": agentRunnable,
 	}
 	supervisor, err := CreateSupervisorTyped(mockLLM, members)
@@ -397,7 +397,7 @@ func TestCreateSupervisorTyped_InvalidRouteArguments(t *testing.T) {
 	agentRunnable, err := agent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnableTyped[SupervisorState]{
+	members := map[string]*graph.StateRunnable[SupervisorState]{
 		"Agent": agentRunnable,
 	}
 	supervisor, err := CreateSupervisorTyped(mockLLM, members)
@@ -425,7 +425,7 @@ func TestCreateSupervisorTyped_LLMError(t *testing.T) {
 	agentRunnable, err := agent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnableTyped[SupervisorState]{
+	members := map[string]*graph.StateRunnable[SupervisorState]{
 		"Agent": agentRunnable,
 	}
 	supervisor, err := CreateSupervisorTyped(mockLLM, members)
@@ -499,7 +499,7 @@ func TestCreateSupervisorTyped_MultipleAgents(t *testing.T) {
 	agent2Runnable, err := agent2.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnableTyped[SupervisorState]{
+	members := map[string]*graph.StateRunnable[SupervisorState]{
 		"Agent1": agent1Runnable,
 		"Agent2": agent2Runnable,
 	}
@@ -558,7 +558,7 @@ func TestCreateSupervisorTyped_EmptyMembers(t *testing.T) {
 	}
 
 	// Empty members map
-	members := map[string]*graph.StateRunnableTyped[SupervisorState]{}
+	members := map[string]*graph.StateRunnable[SupervisorState]{}
 	supervisor, err := CreateSupervisorTyped(mockLLM, members)
 	assert.NoError(t, err)
 
@@ -602,7 +602,7 @@ func TestCreateSupervisorTyped_UnknownAgent(t *testing.T) {
 	agentRunnable, err := agent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnableTyped[SupervisorState]{
+	members := map[string]*graph.StateRunnable[SupervisorState]{
 		"KnownAgent": agentRunnable,
 	}
 	supervisor, err := CreateSupervisorTyped(mockLLM, members)
@@ -632,7 +632,7 @@ func TestCreateSupervisorTyped_NoChoices(t *testing.T) {
 	agentRunnable, err := agent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnableTyped[SupervisorState]{
+	members := map[string]*graph.StateRunnable[SupervisorState]{
 		"Agent": agentRunnable,
 	}
 	supervisor, err := CreateSupervisorTyped(mockLLM, members)
@@ -670,7 +670,7 @@ func TestCreateSupervisorTyped_RouteWithoutFunctionCall(t *testing.T) {
 	agentRunnable, err := agent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnableTyped[SupervisorState]{
+	members := map[string]*graph.StateRunnable[SupervisorState]{
 		"Agent": agentRunnable,
 	}
 	supervisor, err := CreateSupervisorTyped(mockLLM, members)
@@ -766,7 +766,7 @@ func TestCreateSupervisorWithStateTyped(t *testing.T) {
 	}
 
 	// Create a simple mock runnable for the custom state
-	processorWorkflow := graph.NewStateGraphTyped[CustomState]()
+	processorWorkflow := graph.NewStateGraph[CustomState]()
 	processorWorkflow.AddNode("process", "Process node", func(ctx context.Context, state CustomState) (CustomState, error) {
 		state.Messages = append(state.Messages, llms.TextParts(llms.ChatMessageTypeAI, "Processed"))
 		state.Step++
@@ -777,7 +777,7 @@ func TestCreateSupervisorWithStateTyped(t *testing.T) {
 	processorRunnable, err := processorWorkflow.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnableTyped[CustomState]{
+	members := map[string]*graph.StateRunnable[CustomState]{
 		"Processor": processorRunnable,
 	}
 
@@ -856,7 +856,7 @@ func TestCreateSupervisorWithStateTyped_ErrorHandling(t *testing.T) {
 		returnError: errors.New("LLM error in custom state"),
 	}
 
-	members := map[string]*graph.StateRunnableTyped[ErrorState]{}
+	members := map[string]*graph.StateRunnable[ErrorState]{}
 
 	supervisor, err := CreateSupervisorWithStateTyped(
 		mockLLM,
@@ -934,7 +934,7 @@ func TestCreateSupervisorWithStateTyped_MultipleMembers(t *testing.T) {
 	}
 
 	// Create member runnables
-	counterWorkflow := graph.NewStateGraphTyped[MultiState]()
+	counterWorkflow := graph.NewStateGraph[MultiState]()
 	counterWorkflow.AddNode("count", "Count node", func(ctx context.Context, state MultiState) (MultiState, error) {
 		state.Messages = append(state.Messages, llms.TextParts(llms.ChatMessageTypeAI, "Counted"))
 		state.Counter++
@@ -945,7 +945,7 @@ func TestCreateSupervisorWithStateTyped_MultipleMembers(t *testing.T) {
 	counterRunnable, err := counterWorkflow.Compile()
 	require.NoError(t, err)
 
-	loggerWorkflow := graph.NewStateGraphTyped[MultiState]()
+	loggerWorkflow := graph.NewStateGraph[MultiState]()
 	loggerWorkflow.AddNode("log", "Log node", func(ctx context.Context, state MultiState) (MultiState, error) {
 		state.Messages = append(state.Messages, llms.TextParts(llms.ChatMessageTypeAI, "Logged"))
 		return state, nil
@@ -955,7 +955,7 @@ func TestCreateSupervisorWithStateTyped_MultipleMembers(t *testing.T) {
 	loggerRunnable, err := loggerWorkflow.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnableTyped[MultiState]{
+	members := map[string]*graph.StateRunnable[MultiState]{
 		"Counter": counterRunnable,
 		"Logger":  loggerRunnable,
 	}
@@ -1065,7 +1065,7 @@ func TestCreateSupervisorWithStateTyped_EmptyMembers(t *testing.T) {
 	}
 
 	// Empty members map
-	members := map[string]*graph.StateRunnableTyped[EmptyState]{}
+	members := map[string]*graph.StateRunnable[EmptyState]{}
 
 	supervisor, err := CreateSupervisorWithStateTyped(
 		mockLLM,

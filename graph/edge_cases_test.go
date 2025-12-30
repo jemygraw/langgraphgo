@@ -20,14 +20,14 @@ func TestEmptyGraph(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		buildGraph  func() *graph.StateGraph
+		buildGraph  func() *graph.StateGraph[map[string]any]
 		expectError bool
 		errorMsg    string
 	}{
 		{
 			name: "Graph with no nodes",
-			buildGraph: func() *graph.StateGraph {
-				g := graph.NewStateGraph()
+			buildGraph: func() *graph.StateGraph[map[string]any] {
+				g := graph.NewStateGraph[map[string]any]()
 				return g
 			},
 			expectError: true,
@@ -35,9 +35,9 @@ func TestEmptyGraph(t *testing.T) {
 		},
 		{
 			name: "Graph with nodes but no entry point",
-			buildGraph: func() *graph.StateGraph {
-				g := graph.NewStateGraph()
-				g.AddNode("node1", "node1", func(ctx context.Context, state any) (any, error) {
+			buildGraph: func() *graph.StateGraph[map[string]any] {
+				g := graph.NewStateGraph[map[string]any]()
+				g.AddNode("node1", "node1", func(ctx context.Context, state map[string]any) (map[string]any, error) {
 					return state, nil
 				})
 				return g
@@ -47,9 +47,9 @@ func TestEmptyGraph(t *testing.T) {
 		},
 		{
 			name: "Graph with self-referencing node",
-			buildGraph: func() *graph.StateGraph {
-				g := graph.NewStateGraph()
-				g.AddNode("node1", "node1", func(ctx context.Context, state any) (any, error) {
+			buildGraph: func() *graph.StateGraph[map[string]any] {
+				g := graph.NewStateGraph[map[string]any]()
+				g.AddNode("node1", "node1", func(ctx context.Context, state map[string]any) (map[string]any, error) {
 					return state, nil
 				})
 				g.AddEdge("node1", "node1") // Self-loop
@@ -83,15 +83,14 @@ func TestLargeGraph(t *testing.T) {
 		t.Skip("Skipping large graph test in short mode")
 	}
 
-	g := graph.NewStateGraph()
+	g := graph.NewStateGraph[int]()
 
 	// Create a chain of 1000 nodes
 	nodeCount := 1000
 	for i := range nodeCount {
 		nodeName := fmt.Sprintf("node_%d", i)
-		g.AddNode(nodeName, nodeName, func(ctx context.Context, state any) (any, error) {
-			counter := state.(int)
-			return counter + 1, nil
+		g.AddNode(nodeName, nodeName, func(ctx context.Context, state int) (int, error) {
+			return state + 1, nil
 		})
 
 		if i > 0 {
@@ -128,10 +127,10 @@ func TestLargeGraph(t *testing.T) {
 func TestConcurrentExecution(t *testing.T) {
 	t.Parallel()
 
-	g := graph.NewStateGraph()
+	g := graph.NewStateGraph[map[string]any]()
 
 	var counter int32
-	g.AddNode("increment", "increment", func(ctx context.Context, state any) (any, error) {
+	g.AddNode("increment", "increment", func(ctx context.Context, state map[string]any) (map[string]any, error) {
 		atomic.AddInt32(&counter, 1)
 		return state, nil
 	})
@@ -154,7 +153,7 @@ func TestConcurrentExecution(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 			ctx := context.Background()
-			_, err := runnable.Invoke(ctx, id)
+			_, err := runnable.Invoke(ctx, map[string]any{"id": id})
 			if err != nil {
 				errors <- err
 			}
@@ -180,10 +179,10 @@ func TestConcurrentExecution(t *testing.T) {
 func TestContextCancellation(t *testing.T) {
 	t.Parallel()
 
-	g := graph.NewStateGraph()
+	g := graph.NewStateGraph[map[string]any]()
 
 	// Add a slow node
-	g.AddNode("slow_node", "slow_node", func(ctx context.Context, state any) (any, error) {
+	g.AddNode("slow_node", "slow_node", func(ctx context.Context, state map[string]any) (map[string]any, error) {
 		select {
 		case <-time.After(5 * time.Second):
 			return state, nil
@@ -205,7 +204,7 @@ func TestContextCancellation(t *testing.T) {
 	defer cancel()
 
 	start := time.Now()
-	_, err = runnable.Invoke(ctx, "test")
+	_, err = runnable.Invoke(ctx, map[string]any{"test": "value"})
 	duration := time.Since(start)
 
 	if err == nil {
@@ -221,9 +220,9 @@ func TestContextCancellation(t *testing.T) {
 func TestPanicRecovery(t *testing.T) {
 	t.Parallel()
 
-	g := graph.NewStateGraph()
+	g := graph.NewStateGraph[map[string]any]()
 
-	g.AddNode("panic_node", "panic_node", func(ctx context.Context, state any) (any, error) {
+	g.AddNode("panic_node", "panic_node", func(ctx context.Context, state map[string]any) (map[string]any, error) {
 		panic("intentional panic")
 	})
 
@@ -237,7 +236,7 @@ func TestPanicRecovery(t *testing.T) {
 
 	// This should handle the panic gracefully and convert it to an error
 	ctx := context.Background()
-	_, err = runnable.Invoke(ctx, "test")
+	_, err = runnable.Invoke(ctx, map[string]any{"test": "value"})
 	if err == nil {
 		t.Error("Expected error from panic recovery")
 	}
@@ -250,56 +249,54 @@ func TestPanicRecovery(t *testing.T) {
 func TestComplexConditionalRouting(t *testing.T) {
 	t.Parallel()
 
-	g := graph.NewStateGraph()
+	g := graph.NewStateGraph[map[string]any]()
 
 	// Create a decision tree with multiple levels
-	g.AddNode("root", "root", func(ctx context.Context, state any) (any, error) {
+	g.AddNode("root", "root", func(ctx context.Context, state map[string]any) (map[string]any, error) {
 		return state, nil
 	})
 
-	g.AddNode("branch_a", "branch_a", func(ctx context.Context, state any) (any, error) {
-		m := state.(map[string]any)
-		m["path"] = append(m["path"].([]string), "A")
-		return m, nil
+	g.AddNode("branch_a", "branch_a", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		path := append(state["path"].([]string), "A")
+		state["path"] = path
+		return state, nil
 	})
 
-	g.AddNode("branch_b", "branch_b", func(ctx context.Context, state any) (any, error) {
-		m := state.(map[string]any)
-		m["path"] = append(m["path"].([]string), "B")
-		return m, nil
+	g.AddNode("branch_b", "branch_b", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		path := append(state["path"].([]string), "B")
+		state["path"] = path
+		return state, nil
 	})
 
-	g.AddNode("leaf_a1", "leaf_a1", func(ctx context.Context, state any) (any, error) {
-		m := state.(map[string]any)
-		m["path"] = append(m["path"].([]string), "A1")
-		return m, nil
+	g.AddNode("leaf_a1", "leaf_a1", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		path := append(state["path"].([]string), "A1")
+		state["path"] = path
+		return state, nil
 	})
 
-	g.AddNode("leaf_a2", "leaf_a2", func(ctx context.Context, state any) (any, error) {
-		m := state.(map[string]any)
-		m["path"] = append(m["path"].([]string), "A2")
-		return m, nil
+	g.AddNode("leaf_a2", "leaf_a2", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		path := append(state["path"].([]string), "A2")
+		state["path"] = path
+		return state, nil
 	})
 
-	g.AddNode("leaf_b1", "leaf_b1", func(ctx context.Context, state any) (any, error) {
-		m := state.(map[string]any)
-		m["path"] = append(m["path"].([]string), "B1")
-		return m, nil
+	g.AddNode("leaf_b1", "leaf_b1", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		path := append(state["path"].([]string), "B1")
+		state["path"] = path
+		return state, nil
 	})
 
 	// Root conditional
-	g.AddConditionalEdge("root", func(ctx context.Context, state any) string {
-		m := state.(map[string]any)
-		if m["choice"].(string) == "A" {
+	g.AddConditionalEdge("root", func(ctx context.Context, state map[string]any) string {
+		if state["choice"].(string) == "A" {
 			return "branch_a"
 		}
 		return "branch_b"
 	})
 
 	// Branch A conditional
-	g.AddConditionalEdge("branch_a", func(ctx context.Context, state any) string {
-		m := state.(map[string]any)
-		if m["subchoice"].(int) == 1 {
+	g.AddConditionalEdge("branch_a", func(ctx context.Context, state map[string]any) string {
+		if state["subchoice"].(int) == 1 {
 			return "leaf_a1"
 		}
 		return "leaf_a2"
@@ -358,8 +355,7 @@ func TestComplexConditionalRouting(t *testing.T) {
 				t.Fatalf("Execution failed: %v", err)
 			}
 
-			m := result.(map[string]any)
-			path := m["path"].([]string)
+			path := result["path"].([]string)
 
 			if len(path) != len(tt.expectedPath) {
 				t.Errorf("Expected path %v, got %v", tt.expectedPath, path)
@@ -380,119 +376,101 @@ func TestComplexConditionalRouting(t *testing.T) {
 func TestStateModification(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name           string
-		buildGraph     func() *graph.StateGraph
-		initialState   any
-		expectedResult any
-	}{
-		{
-			name: "Accumulator pattern",
-			buildGraph: func() *graph.StateGraph {
-				g := graph.NewStateGraph()
-				g.AddNode("accumulate", "accumulate", func(ctx context.Context, state any) (any, error) {
-					acc := state.([]int)
-					return append(acc, len(acc)+1), nil
-				})
-				g.AddConditionalEdge("accumulate", func(ctx context.Context, state any) string {
-					acc := state.([]int)
-					if len(acc) >= 5 {
-						return graph.END
-					}
-					return "accumulate"
-				})
-				g.SetEntryPoint("accumulate")
-				return g
-			},
-			initialState:   []int{},
-			expectedResult: []int{1, 2, 3, 4, 5},
-		},
-		{
-			name: "Map transformation",
-			buildGraph: func() *graph.StateGraph {
-				g := graph.NewStateGraph()
-				g.AddNode("transform", "transform", func(ctx context.Context, state any) (any, error) {
-					m := state.(map[string]any)
-					// Transform each value
-					for k, v := range m {
-						if num, ok := v.(int); ok {
-							m[k] = num * 2
-						}
-					}
-					return m, nil
-				})
-				g.AddEdge("transform", graph.END)
-				g.SetEntryPoint("transform")
-				return g
-			},
-			initialState: map[string]any{
-				"a": 1,
-				"b": 2,
-				"c": 3,
-			},
-			expectedResult: map[string]any{
-				"a": 2,
-				"b": 4,
-				"c": 6,
-			},
-		},
-	}
+	t.Run("Accumulator pattern", func(t *testing.T) {
+		t.Parallel()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			g := tt.buildGraph()
-			runnable, err := g.Compile()
-			if err != nil {
-				t.Fatalf("Failed to compile: %v", err)
-			}
-
-			result, err := runnable.Invoke(context.Background(), tt.initialState)
-			if err != nil {
-				t.Fatalf("Execution failed: %v", err)
-			}
-
-			// Compare results
-			switch expected := tt.expectedResult.(type) {
-			case []int:
-				actual := result.([]int)
-				if len(actual) != len(expected) {
-					t.Errorf("Expected %v, got %v", expected, actual)
-				} else {
-					for i := range expected {
-						if actual[i] != expected[i] {
-							t.Errorf("Mismatch at index %d: expected %d, got %d", i, expected[i], actual[i])
-						}
-					}
-				}
-			case map[string]any:
-				actual := result.(map[string]any)
-				for k, v := range expected {
-					if actual[k] != v {
-						t.Errorf("Map mismatch for key %s: expected %v, got %v", k, v, actual[k])
-					}
-				}
-			}
+		g := graph.NewStateGraph[[]int]()
+		g.AddNode("accumulate", "accumulate", func(ctx context.Context, state []int) ([]int, error) {
+			return append(state, len(state)+1), nil
 		})
-	}
+		g.AddConditionalEdge("accumulate", func(ctx context.Context, state []int) string {
+			if len(state) >= 5 {
+				return graph.END
+			}
+			return "accumulate"
+		})
+		g.SetEntryPoint("accumulate")
+
+		runnable, err := g.Compile()
+		if err != nil {
+			t.Fatalf("Failed to compile: %v", err)
+		}
+
+		result, err := runnable.Invoke(context.Background(), []int{})
+		if err != nil {
+			t.Fatalf("Execution failed: %v", err)
+		}
+
+		expected := []int{1, 2, 3, 4, 5}
+		if len(result) != len(expected) {
+			t.Errorf("Expected %v, got %v", expected, result)
+		} else {
+			for i := range expected {
+				if result[i] != expected[i] {
+					t.Errorf("Mismatch at index %d: expected %d, got %d", i, expected[i], result[i])
+				}
+			}
+		}
+	})
+
+	t.Run("Map transformation", func(t *testing.T) {
+		t.Parallel()
+
+		g := graph.NewStateGraph[map[string]any]()
+		g.AddNode("transform", "transform", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+			// Transform each value
+			for k, v := range state {
+				if num, ok := v.(int); ok {
+					state[k] = num * 2
+				}
+			}
+			return state, nil
+		})
+		g.AddEdge("transform", graph.END)
+		g.SetEntryPoint("transform")
+
+		runnable, err := g.Compile()
+		if err != nil {
+			t.Fatalf("Failed to compile: %v", err)
+		}
+
+		result, err := runnable.Invoke(context.Background(), map[string]any{
+			"a": 1,
+			"b": 2,
+			"c": 3,
+		})
+		if err != nil {
+			t.Fatalf("Execution failed: %v", err)
+		}
+
+		expected := map[string]any{
+			"a": 2,
+			"b": 4,
+			"c": 6,
+		}
+		for k, v := range expected {
+			if result[k] != v {
+				t.Errorf("Map mismatch for key %s: expected %v, got %v", k, v, result[k])
+			}
+		}
+	})
 }
 
 // TestErrorPropagation tests error handling and propagation
 func TestErrorPropagation(t *testing.T) {
 	t.Parallel()
 
-	g := graph.NewStateGraph()
+	g := graph.NewStateGraph[string]()
 
-	g.AddNode("node1", "node1", func(ctx context.Context, state any) (any, error) {
+	g.AddNode("node1", "node1", func(ctx context.Context, state string) (string, error) {
 		return "step1", nil
 	})
 
-	g.AddNode("node2", "node2", func(ctx context.Context, state any) (any, error) {
-		return nil, errors.New("deliberate error in node2")
+	g.AddNode("node2", "node2", func(ctx context.Context, state string) (string, error) {
+		return "", errors.New("deliberate error in node2")
 	})
 
-	g.AddNode("node3", "node3", func(ctx context.Context, state any) (any, error) {
+	g.AddNode("node3", "node3", func(ctx context.Context, state string) (string, error) {
 		t.Error("node3 should not be executed after error in node2")
 		return state, nil
 	})
@@ -590,10 +568,9 @@ func TestMessageContentEdgeCases(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			g := graph.NewStateGraph()
-			g.AddNode("process", "process", func(ctx context.Context, state any) (any, error) {
-				msgs := state.([]llms.MessageContent)
-				return tt.transform(msgs), nil
+			g := graph.NewStateGraph[[]llms.MessageContent]()
+			g.AddNode("process", "process", func(ctx context.Context, state []llms.MessageContent) ([]llms.MessageContent, error) {
+				return tt.transform(state), nil
 			})
 			g.AddEdge("process", graph.END)
 			g.SetEntryPoint("process")
@@ -608,32 +585,30 @@ func TestMessageContentEdgeCases(t *testing.T) {
 				t.Fatalf("Execution failed: %v", err)
 			}
 
-			tt.validate(t, result.([]llms.MessageContent))
+			tt.validate(t, result)
 		})
 	}
 }
 
 // BenchmarkConditionalEdges benchmarks conditional edge performance
 func BenchmarkConditionalEdges(b *testing.B) {
-	g := graph.NewStateGraph()
+	g := graph.NewStateGraph[int]()
 
 	// Create a graph with conditional routing
-	g.AddNode("router", "router", func(ctx context.Context, state any) (any, error) {
+	g.AddNode("router", "router", func(ctx context.Context, state int) (int, error) {
 		return state, nil
 	})
 
 	for i := range 10 {
 		nodeName := fmt.Sprintf("node_%d", i)
-		g.AddNode(nodeName, nodeName, func(ctx context.Context, state any) (any, error) {
-			n := state.(int)
-			return n + 1, nil
+		g.AddNode(nodeName, nodeName, func(ctx context.Context, state int) (int, error) {
+			return state + 1, nil
 		})
 		g.AddEdge(nodeName, graph.END)
 	}
 
-	g.AddConditionalEdge("router", func(ctx context.Context, state any) string {
-		n := state.(int)
-		return fmt.Sprintf("node_%d", n%10)
+	g.AddConditionalEdge("router", func(ctx context.Context, state int) string {
+		return fmt.Sprintf("node_%d", state%10)
 	})
 
 	g.SetEntryPoint("router")
@@ -655,16 +630,16 @@ func BenchmarkConditionalEdges(b *testing.B) {
 
 // BenchmarkLargeStateTransfer benchmarks performance with large state objects
 func BenchmarkLargeStateTransfer(b *testing.B) {
-	g := graph.NewStateGraph()
+	g := graph.NewStateGraph[[]byte]()
 
 	// Create nodes that pass large state
-	g.AddNode("node1", "node1", func(ctx context.Context, state any) (any, error) {
+	g.AddNode("node1", "node1", func(ctx context.Context, state []byte) ([]byte, error) {
 		return state, nil
 	})
-	g.AddNode("node2", "node2", func(ctx context.Context, state any) (any, error) {
+	g.AddNode("node2", "node2", func(ctx context.Context, state []byte) ([]byte, error) {
 		return state, nil
 	})
-	g.AddNode("node3", "node3", func(ctx context.Context, state any) (any, error) {
+	g.AddNode("node3", "node3", func(ctx context.Context, state []byte) ([]byte, error) {
 		return state, nil
 	})
 

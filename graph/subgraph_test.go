@@ -9,25 +9,25 @@ import (
 
 func TestSubgraph(t *testing.T) {
 	// 1. Define Child Graph
-	child := NewStateGraph()
-	child.AddNode("child_A", "child_A", func(ctx context.Context, state any) (any, error) {
-		m := state.(map[string]any)
-		m["child_visited"] = true
-		return m, nil
+	child := NewStateGraph[map[string]any]()
+	child.AddNode("child_A", "child_A", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		state["child_visited"] = true
+		return state, nil
 	})
 	child.SetEntryPoint("child_A")
 	child.AddEdge("child_A", END)
 
 	// 2. Define Parent Graph
-	parent := NewStateGraph()
-	parent.AddNode("parent_A", "parent_A", func(ctx context.Context, state any) (any, error) {
-		m := state.(map[string]any)
-		m["parent_visited"] = true
-		return m, nil
+	parent := NewStateGraph[map[string]any]()
+	parent.AddNode("parent_A", "parent_A", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		state["parent_visited"] = true
+		return state, nil
 	})
 
-	// Add Child Graph as a node
-	err := parent.AddSubgraph("child", child)
+	// Add Child Graph as a node - use identity converters for map[string]any
+	err := AddSubgraph(parent, "child", child,
+		func(s map[string]any) map[string]any { return s },
+		func(s map[string]any) map[string]any { return s })
 	assert.NoError(t, err)
 
 	parent.SetEntryPoint("parent_A")
@@ -41,26 +41,23 @@ func TestSubgraph(t *testing.T) {
 	res, err := runnable.Invoke(context.Background(), map[string]any{})
 	assert.NoError(t, err)
 
-	mRes := res.(map[string]any)
-	assert.True(t, mRes["parent_visited"].(bool))
-	assert.True(t, mRes["child_visited"].(bool))
+	assert.True(t, res["parent_visited"].(bool))
+	assert.True(t, res["child_visited"].(bool))
 }
 
 func TestCreateSubgraph(t *testing.T) {
 	// Test CreateSubgraph with builder pattern
-	parent := NewStateGraph()
+	parent := NewStateGraph[map[string]any]()
 
-	err := parent.CreateSubgraph("dynamic_child", func(g *StateGraph) {
-		g.AddNode("node1", "Node 1", func(ctx context.Context, state any) (any, error) {
-			m := state.(map[string]any)
-			m["dynamic_created"] = true
-			return m, nil
+	CreateSubgraph(parent, "dynamic_child", func(g *StateGraph[map[string]any]) error {
+		g.AddNode("node1", "Node 1", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+			state["dynamic_created"] = true
+			return state, nil
 		})
 		g.SetEntryPoint("node1")
 		g.AddEdge("node1", END)
-	})
-
-	assert.NoError(t, err)
+		return nil
+	}, func(s map[string]any) map[string]any { return s }, func(s map[string]any) map[string]any { return s })
 
 	// Verify the node was added
 	_, ok := parent.nodes["dynamic_child"]
@@ -79,8 +76,8 @@ func TestNewCompositeGraph(t *testing.T) {
 func TestCompositeGraph_AddGraph(t *testing.T) {
 	cg := NewCompositeGraph()
 
-	graph1 := NewStateGraph()
-	graph1.AddNode("test", "Test", func(ctx context.Context, state any) (any, error) {
+	graph1 := NewStateGraph[map[string]any]()
+	graph1.AddNode("test", "Test", func(ctx context.Context, state map[string]any) (map[string]any, error) {
 		return state, nil
 	})
 
@@ -92,18 +89,16 @@ func TestCompositeGraph_AddGraph(t *testing.T) {
 func TestCompositeGraph_Connect(t *testing.T) {
 	cg := NewCompositeGraph()
 
-	graph1 := NewStateGraph()
-	graph1.AddNode("output1", "Output 1", func(ctx context.Context, state any) (any, error) {
-		m := state.(map[string]any)
-		m["from_graph1"] = true
-		return m, nil
+	graph1 := NewStateGraph[map[string]any]()
+	graph1.AddNode("output1", "Output 1", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		state["from_graph1"] = true
+		return state, nil
 	})
 
-	graph2 := NewStateGraph()
-	graph2.AddNode("input2", "Input 2", func(ctx context.Context, state any) (any, error) {
-		m := state.(map[string]any)
-		m["to_graph2"] = true
-		return m, nil
+	graph2 := NewStateGraph[map[string]any]()
+	graph2.AddNode("input2", "Input 2", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		state["to_graph2"] = true
+		return state, nil
 	})
 
 	// Add graphs to composite
@@ -129,11 +124,10 @@ func TestCompositeGraph_Compile(t *testing.T) {
 	cg := NewCompositeGraph()
 
 	// Add a simple graph
-	simpleGraph := NewStateGraph()
-	simpleGraph.AddNode("test", "Test", func(ctx context.Context, state any) (any, error) {
-		m := state.(map[string]any)
-		m["compiled"] = true
-		return m, nil
+	simpleGraph := NewStateGraph[map[string]any]()
+	simpleGraph.AddNode("test", "Test", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		state["compiled"] = true
+		return state, nil
 	})
 	simpleGraph.SetEntryPoint("test")
 	simpleGraph.AddEdge("test", END)
@@ -191,13 +185,12 @@ func TestRecursiveSubgraph_Execute(t *testing.T) {
 	)
 
 	// Add a node to the recursive graph
-	rs.graph.AddNode("process", "Process", func(ctx context.Context, state any) (any, error) {
-		m := state.(map[string]any)
-		if m["count"] == nil {
-			m["count"] = 0
+	rs.graph.AddNode("process", "Process", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		if state["count"] == nil {
+			state["count"] = 0
 		}
-		m["count"] = m["count"].(int) + 1
-		return m, nil
+		state["count"] = state["count"].(int) + 1
+		return state, nil
 	})
 	rs.graph.SetEntryPoint("process")
 	rs.graph.AddEdge("process", END)
@@ -223,7 +216,7 @@ func TestRecursiveSubgraph_MaxDepth(t *testing.T) {
 	)
 
 	// Add a node
-	rs.graph.AddNode("process", "Process", func(ctx context.Context, state any) (any, error) {
+	rs.graph.AddNode("process", "Process", func(ctx context.Context, state map[string]any) (map[string]any, error) {
 		return state, nil
 	})
 	rs.graph.SetEntryPoint("process")

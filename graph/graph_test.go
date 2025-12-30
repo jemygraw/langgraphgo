@@ -24,19 +24,18 @@ func ExampleStateGraph() {
 		panic(err)
 	}
 
-	g := graph.NewStateGraph()
+	g := graph.NewStateGraph[[]llms.MessageContent]()
 
-	g.AddNode("oracle", "oracle", func(ctx context.Context, state any) (any, error) {
-		messages := state.([]llms.MessageContent)
-		r, err := model.GenerateContent(ctx, messages, llms.WithTemperature(0.0))
+	g.AddNode("oracle", "oracle", func(ctx context.Context, state []llms.MessageContent) ([]llms.MessageContent, error) {
+		r, err := model.GenerateContent(ctx, state, llms.WithTemperature(0.0))
 		if err != nil {
 			return nil, err
 		}
-		return append(messages,
+		return append(state,
 			llms.TextParts("ai", r.Choices[0].Content),
 		), nil
 	})
-	g.AddNode(graph.END, graph.END, func(_ context.Context, state any) (any, error) {
+	g.AddNode(graph.END, graph.END, func(_ context.Context, state []llms.MessageContent) ([]llms.MessageContent, error) {
 		return state, nil
 	})
 
@@ -64,22 +63,20 @@ func TestStateGraph(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name           string
-		buildGraph     func() *graph.StateGraph
+		buildGraph     func() *graph.StateGraph[[]llms.MessageContent]
 		inputMessages  []llms.MessageContent
 		expectedOutput []llms.MessageContent
 		expectedError  error
 	}{
 		{
 			name: "Simple graph",
-			buildGraph: func() *graph.StateGraph {
-				g := graph.NewStateGraph()
-				g.AddNode("node1", "node1", func(_ context.Context, state any) (any, error) {
-					messages := state.([]llms.MessageContent)
-					return append(messages, llms.TextParts("ai", "Node 1")), nil
+			buildGraph: func() *graph.StateGraph[[]llms.MessageContent]{
+				g := graph.NewStateGraph[[]llms.MessageContent]()
+				g.AddNode("node1", "node1", func(_ context.Context, state []llms.MessageContent) ([]llms.MessageContent, error) {
+					return append(state, llms.TextParts("ai", "Node 1")), nil
 				})
-				g.AddNode("node2", "node2", func(_ context.Context, state any) (any, error) {
-					messages := state.([]llms.MessageContent)
-					return append(messages, llms.TextParts("ai", "Node 2")), nil
+				g.AddNode("node2", "node2", func(_ context.Context, state []llms.MessageContent) ([]llms.MessageContent, error) {
+					return append(state, llms.TextParts("ai", "Node 2")), nil
 				})
 				g.AddEdge("node1", "node2")
 				g.AddEdge("node2", graph.END)
@@ -96,9 +93,9 @@ func TestStateGraph(t *testing.T) {
 		},
 		{
 			name: "Entry point not set",
-			buildGraph: func() *graph.StateGraph {
-				g := graph.NewStateGraph()
-				g.AddNode("node1", "node1", func(_ context.Context, state any) (any, error) {
+			buildGraph: func() *graph.StateGraph[[]llms.MessageContent]{
+				g := graph.NewStateGraph[[]llms.MessageContent]()
+				g.AddNode("node1", "node1", func(_ context.Context, state []llms.MessageContent) ([]llms.MessageContent, error) {
 					return state, nil
 				})
 				return g
@@ -107,9 +104,9 @@ func TestStateGraph(t *testing.T) {
 		},
 		{
 			name: "Node not found",
-			buildGraph: func() *graph.StateGraph {
-				g := graph.NewStateGraph()
-				g.AddNode("node1", "node1", func(_ context.Context, state any) (any, error) {
+			buildGraph: func() *graph.StateGraph[[]llms.MessageContent]{
+				g := graph.NewStateGraph[[]llms.MessageContent]()
+				g.AddNode("node1", "node1", func(_ context.Context, state []llms.MessageContent) ([]llms.MessageContent, error) {
 					return state, nil
 				})
 				g.AddEdge("node1", "node2")
@@ -120,9 +117,9 @@ func TestStateGraph(t *testing.T) {
 		},
 		{
 			name: "No outgoing edge",
-			buildGraph: func() *graph.StateGraph {
-				g := graph.NewStateGraph()
-				g.AddNode("node1", "node1", func(_ context.Context, state any) (any, error) {
+			buildGraph: func() *graph.StateGraph[[]llms.MessageContent]{
+				g := graph.NewStateGraph[[]llms.MessageContent]()
+				g.AddNode("node1", "node1", func(_ context.Context, state []llms.MessageContent) ([]llms.MessageContent, error) {
 					return state, nil
 				})
 				g.SetEntryPoint("node1")
@@ -132,9 +129,9 @@ func TestStateGraph(t *testing.T) {
 		},
 		{
 			name: "Error in node function",
-			buildGraph: func() *graph.StateGraph {
-				g := graph.NewStateGraph()
-				g.AddNode("node1", "node1", func(_ context.Context, _ any) (any, error) {
+			buildGraph: func() *graph.StateGraph[[]llms.MessageContent]{
+				g := graph.NewStateGraph[[]llms.MessageContent]()
+				g.AddNode("node1", "node1", func(_ context.Context, _ []llms.MessageContent) ([]llms.MessageContent, error) {
 					return nil, errors.New("node error")
 				})
 				g.AddEdge("node1", graph.END)
@@ -169,12 +166,11 @@ func TestStateGraph(t *testing.T) {
 				t.Fatalf("expected error %v, but got nil", tc.expectedError)
 			}
 
-			outputMsgs := output.([]llms.MessageContent)
-			if len(outputMsgs) != len(tc.expectedOutput) {
-				t.Fatalf("expected output length %d, but got %d", len(tc.expectedOutput), len(outputMsgs))
+			if len(output) != len(tc.expectedOutput) {
+				t.Fatalf("expected output length %d, but got %d", len(tc.expectedOutput), len(output))
 			}
 
-			for i, msg := range outputMsgs {
+			for i, msg := range output {
 				got := fmt.Sprint(msg)
 				expected := fmt.Sprint(tc.expectedOutput[i])
 				if got != expected {

@@ -43,7 +43,7 @@ func WithSubAgentHandler(handler tools.SubAgentHandler) Option {
 }
 
 // CreateDeepAgent creates a new deep agent
-func CreateDeepAgent(model llms.Model, opts ...Option) (*graph.StateRunnable, error) {
+func CreateDeepAgent(model llms.Model, opts ...Option) (*graph.StateRunnable[map[string]any], error) {
 	options := DeepAgentOptions{
 		RootDir:      ".",
 		SystemPrompt: "You are a helpful deep agent.",

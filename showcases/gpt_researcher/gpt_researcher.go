@@ -18,7 +18,7 @@ type GPTResearcher struct {
 	ExecutionAgent *ExecutionAgent
 	PublisherAgent *PublisherAgent
 	Tools          *ToolRegistry
-	Graph          *graph.StateRunnable
+	Graph          *graph.StateRunnable[map[string]any]
 }
 
 // NewGPTResearcher creates a new GPT Researcher instance
@@ -83,7 +83,7 @@ func NewGPTResearcher(config *Config) (*GPTResearcher, error) {
 // buildGraph constructs the research workflow using langgraphgo
 func (r *GPTResearcher) buildGraph() error {
 	// Create workflow
-	workflow := graph.NewStateGraph()
+	workflow := graph.NewStateGraph[map[string]any]()
 
 	// Define schema
 	schema := graph.NewMapSchema()
@@ -91,12 +91,46 @@ func (r *GPTResearcher) buildGraph() error {
 	schema.RegisterReducer("search_results", graph.AppendReducer)
 	schema.RegisterReducer("summaries", graph.AppendReducer)
 	schema.RegisterReducer("sources", graph.AppendReducer)
-	workflow.SetSchema(schema)
+	// Wrap in adapter
+	schemaAdapter := &graph.MapSchemaAdapter{Schema: schema}
+	workflow.SetSchema(schemaAdapter)
+
+	// Wrap node functions to match typed signature
+	plannerFn := func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		result, err := r.plannerNode(ctx, state)
+		if err != nil {
+			return nil, err
+		}
+		if resultMap, ok := result.(map[string]any); ok {
+			return resultMap, nil
+		}
+		return state, nil
+	}
+	executorFn := func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		result, err := r.executorNode(ctx, state)
+		if err != nil {
+			return nil, err
+		}
+		if resultMap, ok := result.(map[string]any); ok {
+			return resultMap, nil
+		}
+		return state, nil
+	}
+	publisherFn := func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		result, err := r.publisherNode(ctx, state)
+		if err != nil {
+			return nil, err
+		}
+		if resultMap, ok := result.(map[string]any); ok {
+			return resultMap, nil
+		}
+		return state, nil
+	}
 
 	// Add nodes
-	workflow.AddNode("planner", "Generate research questions", r.plannerNode)
-	workflow.AddNode("executor", "Execute research and gather information", r.executorNode)
-	workflow.AddNode("publisher", "Generate final research report", r.publisherNode)
+	workflow.AddNode("planner", "Generate research questions", plannerFn)
+	workflow.AddNode("executor", "Execute research and gather information", executorFn)
+	workflow.AddNode("publisher", "Generate final research report", publisherFn)
 
 	// Add edges
 	workflow.SetEntryPoint("planner")

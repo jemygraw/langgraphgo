@@ -43,8 +43,8 @@ func TestNodeListenerTypedFunc_OnNodeEvent(t *testing.T) {
 	}
 }
 
-func TestNewListenableNodeTyped(t *testing.T) {
-	node := NodeTyped[TestListenerState]{
+func TestNewListenableTypedNode(t *testing.T) {
+	node := TypedNode[TestListenerState]{
 		Name:        "test-node",
 		Description: "Test node",
 		Function: func(ctx context.Context, state TestListenerState) (TestListenerState, error) {
@@ -52,7 +52,7 @@ func TestNewListenableNodeTyped(t *testing.T) {
 		},
 	}
 
-	ln := NewListenableNodeTyped(node)
+	ln := NewListenableTypedNode(node)
 
 	if ln.Name != "test-node" {
 		t.Errorf("Expected name to be 'test-node', got '%s'", ln.Name)
@@ -72,7 +72,7 @@ func TestNewListenableNodeTyped(t *testing.T) {
 }
 
 func TestListenableNodeTyped_AddListener(t *testing.T) {
-	ln := NewListenableNodeTyped(NodeTyped[TestListenerState]{
+	ln := NewListenableTypedNode(TypedNode[TestListenerState]{
 		Name: "test",
 		Function: func(ctx context.Context, state TestListenerState) (TestListenerState, error) {
 			return state, nil
@@ -101,7 +101,7 @@ func TestListenableNodeTyped_AddListener(t *testing.T) {
 func TestListenableNodeTyped_RemoveListener(t *testing.T) {
 	listener := NodeListenerTypedFunc[TestListenerState](func(ctx context.Context, event NodeEvent, nodeName string, state TestListenerState, err error) {})
 
-	ln := NewListenableNodeTyped(NodeTyped[TestListenerState]{
+	ln := NewListenableTypedNode(TypedNode[TestListenerState]{
 		Name: "test",
 		Function: func(ctx context.Context, state TestListenerState) (TestListenerState, error) {
 			return state, nil
@@ -128,7 +128,7 @@ func TestListenableNodeTyped_RemoveListener(t *testing.T) {
 func TestListenableNodeTyped_RemoveListenerByFunc(t *testing.T) {
 	listener := NodeListenerTypedFunc[TestListenerState](func(ctx context.Context, event NodeEvent, nodeName string, state TestListenerState, err error) {})
 
-	ln := NewListenableNodeTyped(NodeTyped[TestListenerState]{
+	ln := NewListenableTypedNode(TypedNode[TestListenerState]{
 		Name: "test",
 		Function: func(ctx context.Context, state TestListenerState) (TestListenerState, error) {
 			return state, nil
@@ -152,7 +152,7 @@ func TestListenableNodeTyped_RemoveListenerByFunc(t *testing.T) {
 }
 
 func TestListenableNodeTyped_GetListenerIDs(t *testing.T) {
-	ln := NewListenableNodeTyped(NodeTyped[TestListenerState]{
+	ln := NewListenableTypedNode(TypedNode[TestListenerState]{
 		Name: "test",
 		Function: func(ctx context.Context, state TestListenerState) (TestListenerState, error) {
 			return state, nil
@@ -233,7 +233,7 @@ func TestListenableNodeTyped_NotifyListeners(t *testing.T) {
 		},
 	)
 
-	ln := NewListenableNodeTyped(NodeTyped[TestListenerState]{
+	ln := NewListenableTypedNode(TypedNode[TestListenerState]{
 		Name: "test-node",
 		Function: func(ctx context.Context, state TestListenerState) (TestListenerState, error) {
 			return state, nil
@@ -265,7 +265,7 @@ func TestListenableNodeTyped_NotifyListeners(t *testing.T) {
 func TestListenableNodeTyped_Execute(t *testing.T) {
 	var events []string
 
-	ln := NewListenableNodeTyped(NodeTyped[TestListenerState]{
+	ln := NewListenableTypedNode(TypedNode[TestListenerState]{
 		Name: "test-node",
 		Function: func(ctx context.Context, state TestListenerState) (TestListenerState, error) {
 			state.Count++
@@ -315,7 +315,7 @@ func TestListenableNodeTyped_Execute(t *testing.T) {
 func TestListenableNodeTyped_Execute_Error(t *testing.T) {
 	expectedError := errors.New("test error")
 
-	ln := NewListenableNodeTyped(NodeTyped[TestListenerState]{
+	ln := NewListenableTypedNode(TypedNode[TestListenerState]{
 		Name: "test-node",
 		Function: func(ctx context.Context, state TestListenerState) (TestListenerState, error) {
 			return state, expectedError
@@ -359,8 +359,8 @@ func TestNewListenableStateGraphTyped(t *testing.T) {
 		t.Fatal("Graph should not be nil")
 	}
 
-	if g.StateGraphTyped == nil {
-		t.Error("StateGraphTyped should not be nil")
+	if g.StateGraph == nil {
+		t.Error("StateGraph should not be nil")
 	}
 
 	if g.listenableNodes == nil {

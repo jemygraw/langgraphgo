@@ -81,7 +81,7 @@ type TreeOfThoughtsConfig struct {
 // - Logic puzzles with clear rules and goal states
 // - Complex planning problems with constraints
 // - Problems where multiple strategies should be explored
-func CreateTreeOfThoughtsAgent(config TreeOfThoughtsConfig) (*graph.StateRunnable, error) {
+func CreateTreeOfThoughtsAgent(config TreeOfThoughtsConfig) (*graph.StateRunnable[map[string]any], error) {
 	if config.Generator == nil {
 		return nil, fmt.Errorf("generator is required")
 	}
@@ -103,7 +103,7 @@ func CreateTreeOfThoughtsAgent(config TreeOfThoughtsConfig) (*graph.StateRunnabl
 	}
 
 	// Create the workflow
-	workflow := graph.NewStateGraph()
+	workflow := graph.NewStateGraph[map[string]any]()
 
 	// Define state schema
 	agentSchema := graph.NewMapSchema()
@@ -111,20 +111,21 @@ func CreateTreeOfThoughtsAgent(config TreeOfThoughtsConfig) (*graph.StateRunnabl
 	agentSchema.RegisterReducer("solution", graph.OverwriteReducer)
 	agentSchema.RegisterReducer("visited_states", graph.OverwriteReducer)
 	agentSchema.RegisterReducer("iteration", graph.OverwriteReducer)
-	workflow.SetSchema(agentSchema)
+	schemaAdapter := &graph.MapSchemaAdapter{Schema: agentSchema}
+	workflow.SetSchema(schemaAdapter)
 
 	// Add initialize node
-	workflow.AddNode("initialize", "Initialize search with starting state", func(ctx context.Context, state any) (any, error) {
+	workflow.AddNode("initialize", "Initialize search with starting state", func(ctx context.Context, state map[string]any) (map[string]any, error) {
 		return initializeNode(ctx, state, config)
 	})
 
 	// Add expand node
-	workflow.AddNode("expand", "Expand active paths by generating new thoughts", func(ctx context.Context, state any) (any, error) {
+	workflow.AddNode("expand", "Expand active paths by generating new thoughts", func(ctx context.Context, state map[string]any) (map[string]any, error) {
 		return expandNode(ctx, state, config)
 	})
 
 	// Add evaluate node
-	workflow.AddNode("evaluate", "Evaluate and prune paths", func(ctx context.Context, state any) (any, error) {
+	workflow.AddNode("evaluate", "Evaluate and prune paths", func(ctx context.Context, state map[string]any) (map[string]any, error) {
 		return evaluateNode(ctx, state, config)
 	})
 
@@ -133,10 +134,10 @@ func CreateTreeOfThoughtsAgent(config TreeOfThoughtsConfig) (*graph.StateRunnabl
 
 	// Add edges
 	workflow.AddEdge("initialize", "expand")
-	workflow.AddConditionalEdge("expand", func(ctx context.Context, state any) string {
+	workflow.AddConditionalEdge("expand", func(ctx context.Context, state map[string]any) string {
 		return routeAfterExpand(state, config)
 	})
-	workflow.AddConditionalEdge("evaluate", func(ctx context.Context, state any) string {
+	workflow.AddConditionalEdge("evaluate", func(ctx context.Context, state map[string]any) string {
 		return routeAfterEvaluate(state, config)
 	})
 
@@ -144,7 +145,7 @@ func CreateTreeOfThoughtsAgent(config TreeOfThoughtsConfig) (*graph.StateRunnabl
 }
 
 // initializeNode sets up the initial search state
-func initializeNode(ctx context.Context, state any, config TreeOfThoughtsConfig) (any, error) {
+func initializeNode(ctx context.Context, state map[string]any, config TreeOfThoughtsConfig) (map[string]any, error) {
 	if config.Verbose {
 		log.Info("initializing Tree of Thoughts search")
 		log.Info("initial state: %s\n", config.InitialState.GetDescription())
@@ -168,8 +169,8 @@ func initializeNode(ctx context.Context, state any, config TreeOfThoughtsConfig)
 }
 
 // expandNode generates new thoughts from active paths
-func expandNode(ctx context.Context, state any, config TreeOfThoughtsConfig) (any, error) {
-	mState := state.(map[string]any)
+func expandNode(ctx context.Context, state map[string]any, config TreeOfThoughtsConfig) (map[string]any, error) {
+	mState := state
 
 	activePaths, ok := mState["active_paths"].([]SearchPath)
 	if !ok || len(activePaths) == 0 {
@@ -260,8 +261,8 @@ func expandNode(ctx context.Context, state any, config TreeOfThoughtsConfig) (an
 }
 
 // evaluateNode evaluates and prunes paths
-func evaluateNode(ctx context.Context, state any, config TreeOfThoughtsConfig) (any, error) {
-	mState := state.(map[string]any)
+func evaluateNode(ctx context.Context, state map[string]any, config TreeOfThoughtsConfig) (map[string]any, error) {
+	mState := state
 
 	activePaths, ok := mState["active_paths"].([]SearchPath)
 	if !ok || len(activePaths) == 0 {
@@ -327,8 +328,8 @@ func evaluateNode(ctx context.Context, state any, config TreeOfThoughtsConfig) (
 
 // Routing functions
 
-func routeAfterExpand(state any, config TreeOfThoughtsConfig) string {
-	mState := state.(map[string]any)
+func routeAfterExpand(state map[string]any, config TreeOfThoughtsConfig) string {
+	mState := state
 
 	// Check if solution found
 	if solution, ok := mState["solution"].(SearchPath); ok && solution.States != nil {
@@ -360,8 +361,8 @@ func routeAfterExpand(state any, config TreeOfThoughtsConfig) string {
 	return "evaluate"
 }
 
-func routeAfterEvaluate(state any, config TreeOfThoughtsConfig) string {
-	mState := state.(map[string]any)
+func routeAfterEvaluate(state map[string]any, config TreeOfThoughtsConfig) string {
+	mState := state
 
 	// Check if any active paths remain
 	activePaths, ok := mState["active_paths"].([]SearchPath)

@@ -11,14 +11,15 @@ import (
 )
 
 // CreateSupervisor creates a supervisor graph that orchestrates multiple agents
-func CreateSupervisor(model llms.Model, members map[string]*graph.StateRunnable) (*graph.StateRunnable, error) {
-	workflow := graph.NewStateGraph()
+func CreateSupervisor(model llms.Model, members map[string]*graph.StateRunnable[map[string]any]) (*graph.StateRunnable[map[string]any], error) {
+	workflow := graph.NewStateGraph[map[string]any]()
 
 	// Define state schema
 	// We use MapSchema with AppendReducer for messages
 	schema := graph.NewMapSchema()
 	schema.RegisterReducer("messages", graph.AppendReducer)
-	workflow.SetSchema(schema)
+	schemaAdapter := &graph.MapSchemaAdapter{Schema: schema}
+	workflow.SetSchema(schemaAdapter)
 
 	// Get member names
 	var memberNames []string
@@ -27,11 +28,8 @@ func CreateSupervisor(model llms.Model, members map[string]*graph.StateRunnable)
 	}
 
 	// Define supervisor node
-	workflow.AddNode("supervisor", "Supervisor orchestration node", func(ctx context.Context, state any) (any, error) {
-		mState, ok := state.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("invalid state type")
-		}
+	workflow.AddNode("supervisor", "Supervisor orchestration node", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		mState := state
 
 		messages, ok := mState["messages"].([]llms.MessageContent)
 		if !ok {
@@ -118,7 +116,7 @@ func CreateSupervisor(model llms.Model, members map[string]*graph.StateRunnable)
 		agentName := name
 		agentRunnable := agent
 
-		workflow.AddNode(agentName, "Agent: "+agentName, func(ctx context.Context, state any) (any, error) {
+		workflow.AddNode(agentName, "Agent: "+agentName, func(ctx context.Context, state map[string]any) (map[string]any, error) {
 			// Invoke agent
 			// We pass the full state
 			res, err := agentRunnable.Invoke(ctx, state)
@@ -136,8 +134,8 @@ func CreateSupervisor(model llms.Model, members map[string]*graph.StateRunnable)
 	workflow.SetEntryPoint("supervisor")
 
 	// Conditional edge from supervisor
-	workflow.AddConditionalEdge("supervisor", func(ctx context.Context, state any) string {
-		mState := state.(map[string]any)
+	workflow.AddConditionalEdge("supervisor", func(ctx context.Context, state map[string]any) string {
+		mState := state
 		next, ok := mState["next"].(string)
 		if !ok {
 			return graph.END

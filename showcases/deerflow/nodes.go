@@ -32,6 +32,39 @@ func logf(ctx context.Context, format string, args ...any) {
 	}
 }
 
+// Typed node functions that wrap the untyped implementations
+func PlannerNodeTyped(ctx context.Context, state *State) (*State, error) {
+	result, err := PlannerNode(ctx, state)
+	if err != nil {
+		return nil, err
+	}
+	return result.(*State), nil
+}
+
+func ResearcherNodeTyped(ctx context.Context, state *State) (*State, error) {
+	result, err := ResearcherNode(ctx, state)
+	if err != nil {
+		return nil, err
+	}
+	return result.(*State), nil
+}
+
+func ReporterNodeTyped(ctx context.Context, state *State) (*State, error) {
+	result, err := ReporterNode(ctx, state)
+	if err != nil {
+		return nil, err
+	}
+	return result.(*State), nil
+}
+
+func PodcastNodeTyped(ctx context.Context, state *State) (*State, error) {
+	result, err := PodcastNode(ctx, state)
+	if err != nil {
+		return nil, err
+	}
+	return result.(*State), nil
+}
+
 // PlannerNode generates a research plan based on the query.
 func PlannerNode(ctx context.Context, state any) (any, error) {
 	s := state.(*State)

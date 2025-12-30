@@ -8,20 +8,21 @@ import (
 )
 
 func TestVisualization(t *testing.T) {
-	g := NewStateGraph()
-	g.AddNode("A", "A", func(ctx context.Context, state any) (any, error) { return state, nil })
-	g.AddNode("B", "B", func(ctx context.Context, state any) (any, error) { return state, nil })
-	g.AddNode("C", "C", func(ctx context.Context, state any) (any, error) { return state, nil })
+	g := NewStateGraph[map[string]any]()
+	g.AddNode("A", "A", func(ctx context.Context, state map[string]any) (map[string]any, error) { return state, nil })
+	g.AddNode("B", "B", func(ctx context.Context, state map[string]any) (map[string]any, error) { return state, nil })
+	g.AddNode("C", "C", func(ctx context.Context, state map[string]any) (map[string]any, error) { return state, nil })
 
 	g.SetEntryPoint("A")
 	g.AddEdge("A", "B")
-	g.AddConditionalEdge("B", func(ctx context.Context, state any) string { return "C" })
+	g.AddConditionalEdge("B", func(ctx context.Context, state map[string]any) string { return "C" })
 	g.AddEdge("C", END)
 
-	runnable, err := g.Compile()
+	_, err := g.Compile()
 	assert.NoError(t, err)
 
-	exporter := runnable.GetGraph()
+	// Create an exporter for the graph
+	exporter := NewExporter(g)
 
 	// Test Mermaid
 	mermaid := exporter.DrawMermaid()

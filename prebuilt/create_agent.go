@@ -64,29 +64,27 @@ func WithVerbose(verbose bool) CreateAgentOption {
 }
 
 // CreateAgent creates a new agent graph with options
-func CreateAgent(model llms.Model, inputTools []tools.Tool, opts ...CreateAgentOption) (*graph.StateRunnable, error) {
+func CreateAgent(model llms.Model, inputTools []tools.Tool, opts ...CreateAgentOption) (*graph.StateRunnable[map[string]any], error) {
 	options := &CreateAgentOptions{}
 	for _, opt := range opts {
 		opt(options)
 	}
 
 	// Define the graph
-	workflow := graph.NewStateGraph()
+	workflow := graph.NewStateGraph[map[string]any]()
 
-	// Define the state schema
-	// We use a MapSchema with AppendReducer for messages
+	// Define the state schema - use MapSchemaAdapter
 	agentSchema := graph.NewMapSchema()
 	agentSchema.RegisterReducer("messages", graph.AppendReducer)
 	agentSchema.RegisterReducer("extra_tools", graph.AppendReducer)
-	workflow.SetSchema(agentSchema)
+	// Wrap in schemaAdapter to match StateSchemaTyped[map[string]any]
+	schemaAdapter := &graph.MapSchemaAdapter{Schema: agentSchema}
+	workflow.SetSchema(schemaAdapter)
 
 	// Define the skill selection node if skillDir is provided
 	if options.skillDir != "" {
-		workflow.AddNode("skill", "Skill discovery and selection node", func(ctx context.Context, state any) (any, error) {
-			mState, ok := state.(map[string]any)
-			if !ok {
-				return nil, fmt.Errorf("invalid state type: %T", state)
-			}
+		workflow.AddNode("skill", "Skill discovery and selection node", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+			mState := state // Already map[string]any
 
 			messages, ok := mState["messages"].([]llms.MessageContent)
 			if !ok || len(messages) == 0 {
@@ -172,11 +170,8 @@ func CreateAgent(model llms.Model, inputTools []tools.Tool, opts ...CreateAgentO
 	}
 
 	// Define the agent node
-	workflow.AddNode("agent", "Agent decision node with LLM", func(ctx context.Context, state any) (any, error) {
-		mState, ok := state.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("invalid state type: %T", state)
-		}
+	workflow.AddNode("agent", "Agent decision node with LLM", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		mState := state // Already map[string]any
 
 		messages, ok := mState["messages"].([]llms.MessageContent)
 		if !ok {
@@ -296,11 +291,8 @@ func CreateAgent(model llms.Model, inputTools []tools.Tool, opts ...CreateAgentO
 	})
 
 	// Define the tools node
-	workflow.AddNode("tools", "Tool execution node", func(ctx context.Context, state any) (any, error) {
-		mState, ok := state.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("invalid state")
-		}
+	workflow.AddNode("tools", "Tool execution node", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		mState := state // Already map[string]any
 
 		messages := mState["messages"].([]llms.MessageContent)
 		lastMsg := messages[len(messages)-1]
@@ -378,8 +370,8 @@ func CreateAgent(model llms.Model, inputTools []tools.Tool, opts ...CreateAgentO
 		workflow.SetEntryPoint("agent")
 	}
 
-	workflow.AddConditionalEdge("agent", func(ctx context.Context, state any) string {
-		mState := state.(map[string]any)
+	workflow.AddConditionalEdge("agent", func(ctx context.Context, state map[string]any) string {
+		mState := state // Already map[string]any
 		messages := mState["messages"].([]llms.MessageContent)
 		lastMsg := messages[len(messages)-1]
 

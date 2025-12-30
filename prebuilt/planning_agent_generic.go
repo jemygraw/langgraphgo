@@ -13,28 +13,10 @@ import (
 	"github.com/tmc/langchaingo/tools"
 )
 
-// WorkflowPlan represents the parsed workflow plan from LLM
-type WorkflowPlan struct {
-	Nodes []WorkflowNode `json:"nodes"`
-	Edges []WorkflowEdge `json:"edges"`
-}
-
-// WorkflowNode represents a node in the workflow plan
-type WorkflowNode struct {
-	Name string `json:"name"`
-	Type string `json:"type"` // "start", "process", "end", "conditional"
-}
-
-// WorkflowEdge represents an edge in the workflow plan
-type WorkflowEdge struct {
-	From      string `json:"from"`
-	To        string `json:"to"`
-	Condition string `json:"condition,omitempty"` // For conditional edges
-}
-
-// CreatePlanningAgent creates an agent that first plans the workflow using LLM,
-// then executes according to the generated plan
-func CreatePlanningAgent(model llms.Model, nodes []*graph.Node, inputTools []tools.Tool, opts ...CreateAgentOption) (*graph.StateRunnable[map[string]any], error) {
+// CreatePlanningAgentTyped creates a generic planning agent that first plans the workflow using LLM,
+// then executes according to the generated plan.
+// This version uses fixed PlanningAgentState for full type safety.
+func CreatePlanningAgentTyped(model llms.Model, nodes []*graph.Node, inputTools []tools.Tool, opts ...CreateAgentOption) (*graph.StateRunnable[PlanningAgentState], error) {
 	options := &CreateAgentOptions{}
 	for _, opt := range opts {
 		opt(options)
@@ -46,28 +28,31 @@ func CreatePlanningAgent(model llms.Model, nodes []*graph.Node, inputTools []too
 		nodeMap[node.Name] = node
 	}
 
-	// Define the workflow
-	workflow := graph.NewStateGraph[map[string]any]()
+	// Define the workflow with generic state type
+	workflow := graph.NewStateGraph[PlanningAgentState]()
 
-	// Define the state schema
-	agentSchema := graph.NewMapSchema()
-	agentSchema.RegisterReducer("messages", graph.AppendReducer)
-	agentSchema.RegisterReducer("workflow_plan", graph.OverwriteReducer)
-	schemaAdapter := &graph.MapSchemaAdapter{Schema: agentSchema}
-	workflow.SetSchema(schemaAdapter)
+	// Define the state schema for merging
+	schema := graph.NewStructSchema(
+		PlanningAgentState{},
+		func(current, new PlanningAgentState) (PlanningAgentState, error) {
+			// Append new messages to current messages
+			current.Messages = append(current.Messages, new.Messages...)
+			// Overwrite workflow plan
+			current.WorkflowPlan = new.WorkflowPlan
+			return current, nil
+		},
+	)
+	workflow.SetSchema(schema)
 
 	// Add planning node - this is where LLM generates the workflow
-	workflow.AddNode("planner", "Generates workflow plan based on user request", func(ctx context.Context, state map[string]any) (map[string]any, error) {
-		mState := state
-
-		messages, ok := mState["messages"].([]llms.MessageContent)
-		if !ok || len(messages) == 0 {
-			return nil, fmt.Errorf("no messages found in state")
+	workflow.AddNode("planner", "Generates workflow plan based on user request", func(ctx context.Context, state PlanningAgentState) (PlanningAgentState, error) {
+		if len(state.Messages) == 0 {
+			return state, fmt.Errorf("no messages in state")
 		}
 
 		// Build the planning prompt
-		nodeDescriptions := buildNodeDescriptions(nodes)
-		planningPrompt := buildPlanningPrompt(nodeDescriptions)
+		nodeDescriptions := buildNodeDescriptionsTyped(nodes)
+		planningPrompt := buildPlanningPromptTyped(nodeDescriptions)
 
 		// Prepare messages for LLM
 		planningMessages := []llms.MessageContent{
@@ -76,7 +61,7 @@ func CreatePlanningAgent(model llms.Model, nodes []*graph.Node, inputTools []too
 				Parts: []llms.ContentPart{llms.TextPart(planningPrompt)},
 			},
 		}
-		planningMessages = append(planningMessages, messages...)
+		planningMessages = append(planningMessages, state.Messages...)
 
 		if options.Verbose {
 			log.Info("planning workflow...")
@@ -85,7 +70,7 @@ func CreatePlanningAgent(model llms.Model, nodes []*graph.Node, inputTools []too
 		// Call LLM to generate the plan
 		resp, err := model.GenerateContent(ctx, planningMessages)
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate plan: %w", err)
+			return state, fmt.Errorf("failed to generate plan: %w", err)
 		}
 
 		planText := resp.Choices[0].Content
@@ -94,9 +79,9 @@ func CreatePlanningAgent(model llms.Model, nodes []*graph.Node, inputTools []too
 		}
 
 		// Parse the workflow plan
-		workflowPlan, err := parseWorkflowPlan(planText)
+		workflowPlan, err := parseWorkflowPlanTyped(planText)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse workflow plan: %w", err)
+			return state, fmt.Errorf("failed to parse workflow plan: %w", err)
 		}
 
 		// Store the plan in state
@@ -105,54 +90,52 @@ func CreatePlanningAgent(model llms.Model, nodes []*graph.Node, inputTools []too
 			Parts: []llms.ContentPart{llms.TextPart(fmt.Sprintf("Workflow plan created with %d nodes and %d edges", len(workflowPlan.Nodes), len(workflowPlan.Edges)))},
 		}
 
-		return map[string]any{
-			"messages":      []llms.MessageContent{aiMsg},
-			"workflow_plan": workflowPlan,
+		return PlanningAgentState{
+			Messages:      []llms.MessageContent{aiMsg},
+			WorkflowPlan:  workflowPlan,
 		}, nil
 	})
 
 	// Add executor node - this builds and executes the planned workflow
-	workflow.AddNode("executor", "Executes the planned workflow", func(ctx context.Context, state map[string]any) (map[string]any, error) {
-		mState := state
-
-		workflowPlan, ok := mState["workflow_plan"].(*WorkflowPlan)
-		if !ok {
-			return nil, fmt.Errorf("workflow_plan not found in state")
+	workflow.AddNode("executor", "Executes the planned workflow", func(ctx context.Context, state PlanningAgentState) (PlanningAgentState, error) {
+		if state.WorkflowPlan == nil {
+			return state, fmt.Errorf("workflow_plan not found in state")
 		}
 
 		if options.Verbose {
 			log.Info("executing planned workflow...")
 		}
 
-		// Build the dynamic workflow
+		// Build the dynamic workflow using untyped graph for flexibility
+		// Note: This is a special case where we need dynamic graph construction
 		dynamicWorkflow := graph.NewStateGraph[map[string]any]()
 		dynamicSchema := graph.NewMapSchema()
 		dynamicSchema.RegisterReducer("messages", graph.AppendReducer)
-		dynamicSchemaAdapter := &graph.MapSchemaAdapter{Schema: dynamicSchema}
-		dynamicWorkflow.SetSchema(dynamicSchemaAdapter)
+		// Wrap in adapter to match StateSchemaTyped[map[string]any]
+		schemaAdapter := &graph.MapSchemaAdapter{Schema: dynamicSchema}
+		dynamicWorkflow.SetSchema(schemaAdapter)
 
 		// Add nodes from the plan
-		for _, planNode := range workflowPlan.Nodes {
+		for _, planNode := range state.WorkflowPlan.Nodes {
 			if planNode.Name == "START" || planNode.Name == "END" {
 				continue // Skip special nodes
 			}
 
 			actualNode, exists := nodeMap[planNode.Name]
 			if !exists {
-				return nil, fmt.Errorf("node %s not found in available nodes", planNode.Name)
+				return state, fmt.Errorf("node %s not found in available nodes", planNode.Name)
 			}
 
-			// Wrap the node function to convert from any to map[string]any
-			wrappedFn := func(ctx context.Context, state map[string]any) (map[string]any, error) {
-				result, err := actualNode.Function(ctx, state)
+			// Wrap the node function to match the typed signature
+			wrappedFn := func(ctx context.Context, s map[string]any) (map[string]any, error) {
+				result, err := actualNode.Function(ctx, s)
 				if err != nil {
 					return nil, err
 				}
-				// Convert result to map[string]any if needed
-				if m, ok := result.(map[string]any); ok {
-					return m, nil
+				if resultMap, ok := result.(map[string]any); ok {
+					return resultMap, nil
 				}
-				return nil, fmt.Errorf("node %s returned invalid state type: %T", actualNode.Name, result)
+				return s, nil
 			}
 			dynamicWorkflow.AddNode(actualNode.Name, actualNode.Description, wrappedFn)
 
@@ -165,7 +148,7 @@ func CreatePlanningAgent(model llms.Model, nodes []*graph.Node, inputTools []too
 		var entryPoint string
 		endNodes := make(map[string]bool) // Track nodes that should end
 
-		for _, edge := range workflowPlan.Edges {
+		for _, edge := range state.WorkflowPlan.Edges {
 			if edge.From == "START" {
 				entryPoint = edge.To
 				continue
@@ -179,7 +162,7 @@ func CreatePlanningAgent(model llms.Model, nodes []*graph.Node, inputTools []too
 				// This is a conditional edge
 				// For now, we'll add a simple conditional edge
 				// In a real implementation, you might want to parse the condition
-				dynamicWorkflow.AddConditionalEdge(edge.From, func(ctx context.Context, state map[string]any) string {
+				dynamicWorkflow.AddConditionalEdge(edge.From, func(ctx context.Context, s map[string]any) string {
 					// Simple condition evaluation
 					// You can enhance this to evaluate the actual condition
 					return edge.To
@@ -202,7 +185,7 @@ func CreatePlanningAgent(model llms.Model, nodes []*graph.Node, inputTools []too
 		}
 
 		if entryPoint == "" {
-			return nil, fmt.Errorf("no entry point found in workflow plan")
+			return state, fmt.Errorf("no entry point found in workflow plan")
 		}
 
 		dynamicWorkflow.SetEntryPoint(entryPoint)
@@ -210,20 +193,37 @@ func CreatePlanningAgent(model llms.Model, nodes []*graph.Node, inputTools []too
 		// Compile and execute the dynamic workflow
 		runnable, err := dynamicWorkflow.Compile()
 		if err != nil {
-			return nil, fmt.Errorf("failed to compile dynamic workflow: %w", err)
+			return state, fmt.Errorf("failed to compile dynamic workflow: %w", err)
+		}
+
+		// Convert PlanningAgentState to map[string]any for execution
+		stateMap := map[string]any{
+			"messages":      state.Messages,
+			"workflow_plan": state.WorkflowPlan,
 		}
 
 		// Execute the dynamic workflow with current state
-		result, err := runnable.Invoke(ctx, mState)
+		result, err := runnable.Invoke(ctx, stateMap)
 		if err != nil {
-			return nil, fmt.Errorf("failed to execute dynamic workflow: %w", err)
+			return state, fmt.Errorf("failed to execute dynamic workflow: %w", err)
 		}
 
 		if options.Verbose {
 			log.Info("workflow execution completed")
 		}
 
-		return result, nil
+		// result is already map[string]any
+		resultMap := result
+
+		messages, ok := resultMap["messages"].([]llms.MessageContent)
+		if !ok {
+			messages = state.Messages
+		}
+
+		return PlanningAgentState{
+			Messages:     messages,
+			WorkflowPlan: state.WorkflowPlan,
+		}, nil
 	})
 
 	// Define edges
@@ -234,8 +234,8 @@ func CreatePlanningAgent(model llms.Model, nodes []*graph.Node, inputTools []too
 	return workflow.Compile()
 }
 
-// buildNodeDescriptions creates a formatted string describing all available nodes
-func buildNodeDescriptions(nodes []*graph.Node) string {
+// buildNodeDescriptionsTyped creates a formatted string describing all available nodes
+func buildNodeDescriptionsTyped(nodes []*graph.Node) string {
 	var sb strings.Builder
 	sb.WriteString("Available nodes:\n")
 	for i, node := range nodes {
@@ -244,8 +244,8 @@ func buildNodeDescriptions(nodes []*graph.Node) string {
 	return sb.String()
 }
 
-// buildPlanningPrompt creates the prompt for the LLM to generate a workflow plan
-func buildPlanningPrompt(nodeDescriptions string) string {
+// buildPlanningPromptTyped creates the prompt for the LLM to generate a workflow plan
+func buildPlanningPromptTyped(nodeDescriptions string) string {
 	return fmt.Sprintf(`You are a workflow planning assistant. Based on the user's request, create a workflow plan using the available nodes.
 
 %s
@@ -284,10 +284,10 @@ Example:
 }`, nodeDescriptions)
 }
 
-// parseWorkflowPlan parses the LLM response to extract the workflow plan
-func parseWorkflowPlan(planText string) (*WorkflowPlan, error) {
+// parseWorkflowPlanTyped parses the LLM response to extract the workflow plan
+func parseWorkflowPlanTyped(planText string) (*WorkflowPlan, error) {
 	// Extract JSON from the response (handle markdown code blocks)
-	jsonText := extractJSON(planText)
+	jsonText := extractJSONTyped(planText)
 
 	var plan WorkflowPlan
 	if err := json.Unmarshal([]byte(jsonText), &plan); err != nil {
@@ -305,8 +305,8 @@ func parseWorkflowPlan(planText string) (*WorkflowPlan, error) {
 	return &plan, nil
 }
 
-// extractJSON extracts JSON from a text that might contain markdown code blocks
-func extractJSON(text string) string {
+// extractJSONTyped extracts JSON from a text that might contain markdown code blocks
+func extractJSONTyped(text string) string {
 	// Try to find JSON in markdown code block
 	codeBlockRegex := regexp.MustCompile("(?s)```(?:json)?\\s*({.*?})\\s*```")
 	matches := codeBlockRegex.FindStringSubmatch(text)

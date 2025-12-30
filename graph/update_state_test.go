@@ -18,9 +18,9 @@ func TestUpdateState(t *testing.T) {
 		}
 		return curr.(int) + new.(int), nil
 	})
-	g.SetSchema(schema)
+	g.SetSchema(&MapSchemaAdapter{Schema: schema})
 
-	g.AddNode("A", "A", func(ctx context.Context, state any) (any, error) {
+	g.AddNodeUntyped("A", "A", func(ctx context.Context, state any) (any, error) {
 		return map[string]any{"count": 1}, nil
 	})
 	g.SetEntryPoint("A")

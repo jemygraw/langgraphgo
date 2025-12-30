@@ -10,12 +10,12 @@ import (
 func TestStreamingModes(t *testing.T) {
 	g := NewStreamingStateGraph()
 
-	// Setup simple graph
-	g.AddNode("A", "A", func(ctx context.Context, state any) (any, error) {
-		return "A", nil
+	// Setup simple graph using map-based state
+	g.AddNodeUntyped("A", "A", func(ctx context.Context, state any) (any, error) {
+		return map[string]any{"state": "A"}, nil
 	})
-	g.AddNode("B", "B", func(ctx context.Context, state any) (any, error) {
-		return "B", nil
+	g.AddNodeUntyped("B", "B", func(ctx context.Context, state any) (any, error) {
+		return map[string]any{"state": "B"}, nil
 	})
 	g.SetEntryPoint("A")
 	g.AddEdge("A", "B")
@@ -31,7 +31,7 @@ func TestStreamingModes(t *testing.T) {
 		runnable, err := g.CompileStreaming()
 		assert.NoError(t, err)
 
-		res := runnable.Stream(context.Background(), "Start")
+		res := runnable.Stream(context.Background(), map[string]any{"state": "Start"})
 
 		var events []StreamEvent
 		for event := range res.Events {
@@ -39,22 +39,8 @@ func TestStreamingModes(t *testing.T) {
 		}
 
 		// Expect "graph_step" events
-		// A runs -> state "StartA"
-		// B runs -> state "StartAB"
-		// (Assuming StateGraph appends strings by default or replaces?
-		// StateGraph defaults to simple replacement if no schema?
-		// Wait, StateGraph uses ListenableStateGraph which uses StateGraph.
-		// StateGraph uses default Node/Edge structs.
-		// It does NOT have a default schema/reducer unless set.
-		// If no schema/merger, parallel execution takes last result.
-		// Sequential A->B: A returns "A". State becomes "A".
-		// B returns "B". State becomes "B".
-
-		// Let's verify graph behavior first.
-		// A -> "A". B -> "B".
-		// Events:
-		// 1. graph_step (after A): State "A"
-		// 2. graph_step (after B): State "B"
+		// A runs -> state map{"state": "A"}
+		// B runs -> state map{"state": "B"}
 
 		assert.NotEmpty(t, events)
 		for _, e := range events {
@@ -62,7 +48,10 @@ func TestStreamingModes(t *testing.T) {
 		}
 
 		lastEvent := events[len(events)-1]
-		assert.Equal(t, "B", lastEvent.State)
+		// Extract state from map
+		lastStateMap, ok := lastEvent.State.(map[string]any)
+		assert.True(t, ok, "Expected map state, got %T", lastEvent.State)
+		assert.Equal(t, "B", lastStateMap["state"])
 	})
 
 	// Test StreamModeUpdates
@@ -75,7 +64,7 @@ func TestStreamingModes(t *testing.T) {
 		runnable, err := g.CompileStreaming()
 		assert.NoError(t, err)
 
-		res := runnable.Stream(context.Background(), "Start")
+		res := runnable.Stream(context.Background(), map[string]any{"state": "Start"})
 
 		var events []StreamEvent
 		for event := range res.Events {
@@ -83,18 +72,20 @@ func TestStreamingModes(t *testing.T) {
 		}
 
 		// Expect ToolEnd events (since nodes are treated as tools)
-		// A -> "A"
-		// B -> "B"
+		// A -> map{"state": "A"}
+		// B -> map{"state": "B"}
 
 		foundA := false
 		foundB := false
 		for _, e := range events {
 			if e.Event == NodeEventComplete {
-				if e.State == "A" {
-					foundA = true
-				}
-				if e.State == "B" {
-					foundB = true
+				if stateMap, ok := e.State.(map[string]any); ok {
+					if stateMap["state"] == "A" {
+						foundA = true
+					}
+					if stateMap["state"] == "B" {
+						foundB = true
+					}
 				}
 			}
 		}

@@ -28,7 +28,7 @@ func (m *mapSchemaAdapter) Update(current, new any) (any, error) {
 
 func TestStateGraphTyped_BasicFunctionality(t *testing.T) {
 	// Create a new typed state graph
-	g := NewStateGraphTyped[TestState]()
+	g := NewStateGraph[TestState]()
 
 	// Add nodes
 	g.AddNode("increment", "Increment counter", func(ctx context.Context, state TestState) (TestState, error) {
@@ -71,7 +71,7 @@ func TestStateGraphTyped_BasicFunctionality(t *testing.T) {
 }
 
 func TestStateGraphTyped_ConditionalEdges(t *testing.T) {
-	g := NewStateGraphTyped[TestState]()
+	g := NewStateGraph[TestState]()
 
 	g.AddNode("process", "Process", func(ctx context.Context, state TestState) (TestState, error) {
 		state.Count++
@@ -123,7 +123,7 @@ func TestStateGraphTyped_ConditionalEdges(t *testing.T) {
 }
 
 func TestStateGraphTyped_WithSchema(t *testing.T) {
-	g := NewStateGraphTyped[TestState]()
+	g := NewStateGraph[TestState]()
 
 	// Define schema with merge function
 	schema := NewStructSchema(
@@ -212,7 +212,7 @@ func TestListenableStateGraphTyped_BasicFunctionality(t *testing.T) {
 }
 
 func TestStateGraphTyped_ParallelExecution(t *testing.T) {
-	g := NewStateGraphTyped[TestState]()
+	g := NewStateGraph[TestState]()
 
 	// Add multiple nodes that can run in parallel
 	g.AddNode("node1", "Node 1", func(ctx context.Context, state TestState) (TestState, error) {
@@ -256,7 +256,7 @@ func TestStateGraphTyped_ParallelExecution(t *testing.T) {
 }
 
 func BenchmarkStateGraphTyped_Invoke(b *testing.B) {
-	g := NewStateGraphTyped[TestState]()
+	g := NewStateGraph[TestState]()
 
 	g.AddNode("increment", "Increment", func(ctx context.Context, state TestState) (TestState, error) {
 		state.Count++
@@ -311,7 +311,7 @@ func BenchmarkListenableStateGraphTyped_Invoke(b *testing.B) {
 
 // Test StateGraphTyped methods directly
 func TestStateGraphTyped_AdditionalMethods(t *testing.T) {
-	g := NewStateGraphTyped[TestState]()
+	g := NewStateGraph[TestState]()
 
 	// Test SetRetryPolicy
 	policy := &RetryPolicy{
@@ -337,9 +337,9 @@ func TestStateGraphTyped_AdditionalMethods(t *testing.T) {
 	}
 }
 
-// Test StateRunnableTyped methods
-func TestStateRunnableTyped_SetTracer(t *testing.T) {
-	g := NewStateGraphTyped[TestState]()
+// Test StateRunnable methods
+func TestStateRunnable_SetTracer(t *testing.T) {
+	g := NewStateGraph[TestState]()
 	g.AddNode("test", "Test node", func(ctx context.Context, state TestState) (TestState, error) {
 		return state, nil
 	})
@@ -359,8 +359,8 @@ func TestStateRunnableTyped_SetTracer(t *testing.T) {
 	}
 }
 
-func TestStateRunnableTyped_WithTracer(t *testing.T) {
-	g := NewStateGraphTyped[TestState]()
+func TestStateRunnable_WithTracer(t *testing.T) {
+	g := NewStateGraph[TestState]()
 	g.AddNode("test", "Test node", func(ctx context.Context, state TestState) (TestState, error) {
 		return state, nil
 	})
@@ -386,7 +386,7 @@ func TestStateRunnableTyped_WithTracer(t *testing.T) {
 
 // Test edge cases
 func TestStateGraphTyped_MultipleEdgesFromNode(t *testing.T) {
-	g := NewStateGraphTyped[TestState]()
+	g := NewStateGraph[TestState]()
 
 	g.AddNode("source", "Source node", func(ctx context.Context, state TestState) (TestState, error) {
 		return state, nil
@@ -444,7 +444,7 @@ func TestStateGraphTyped_ComplexStateType(t *testing.T) {
 		Processed bool
 	}
 
-	g := NewStateGraphTyped[ComplexState]()
+	g := NewStateGraph[ComplexState]()
 
 	g.AddNode("process", "Process complex state", func(ctx context.Context, state ComplexState) (ComplexState, error) {
 		state.Info.Name = "processed"
@@ -486,7 +486,7 @@ func TestStateGraphTyped_ComplexStateType(t *testing.T) {
 
 func TestStateGraphTyped_MapState(t *testing.T) {
 	// Test with map state
-	g := NewStateGraphTyped[map[string]any]()
+	g := NewStateGraph[map[string]any]()
 
 	g.AddNode("process", "Process map", func(ctx context.Context, state map[string]any) (map[string]any, error) {
 		state["count"] = state["count"].(int) + 1
@@ -527,7 +527,7 @@ func TestStateGraphTyped_MapState(t *testing.T) {
 
 func TestStateGraphTyped_StringState(t *testing.T) {
 	// Test with simple string state
-	g := NewStateGraphTyped[string]()
+	g := NewStateGraph[string]()
 
 	g.AddNode("process", "Process string", func(ctx context.Context, state string) (string, error) {
 		return state + "_processed", nil
@@ -552,8 +552,8 @@ func TestStateGraphTyped_StringState(t *testing.T) {
 }
 
 // Test helper functions
-func TestStateRunnableTyped_HelperFunctions(t *testing.T) {
-	g := NewStateGraphTyped[TestState]()
+func TestStateRunnable_HelperFunctions(t *testing.T) {
+	g := NewStateGraph[TestState]()
 	g.AddNode("test", "Test", func(ctx context.Context, state TestState) (TestState, error) {
 		return state, nil
 	})
@@ -623,7 +623,7 @@ func TestStateRunnableTyped_HelperFunctions(t *testing.T) {
 }
 
 func TestInvokeWithConfig_WithTags(t *testing.T) {
-	g := NewStateGraphTyped[TestState]()
+	g := NewStateGraph[TestState]()
 
 	g.AddNode("process", "Process", func(ctx context.Context, state TestState) (TestState, error) {
 		state.Count++
@@ -655,7 +655,7 @@ func TestInvokeWithConfig_WithTags(t *testing.T) {
 }
 
 func TestExecuteNodesParallel_ErrorHandling(t *testing.T) {
-	g := NewStateGraphTyped[TestState]()
+	g := NewStateGraph[TestState]()
 
 	// Add nodes
 	g.AddNode("error", "Error node", func(ctx context.Context, state TestState) (TestState, error) {
@@ -685,7 +685,7 @@ func TestExecuteNodesParallel_ErrorHandling(t *testing.T) {
 }
 
 func TestExecuteNodeWithRetry_RetryPolicy(t *testing.T) {
-	g := NewStateGraphTyped[TestState]()
+	g := NewStateGraph[TestState]()
 
 	attempt := 0
 	g.AddNode("retry", "Retry node", func(ctx context.Context, state TestState) (TestState, error) {
@@ -727,7 +727,7 @@ func TestExecuteNodeWithRetry_RetryPolicy(t *testing.T) {
 
 func TestStateGraphTyped_CommandGoto(t *testing.T) {
 	// Use any type to allow returning Command
-	g := NewStateGraphTyped[any]()
+	g := NewStateGraph[any]()
 
 	// Create a typed schema adapter for map[string]any
 	mapSchema := NewMapSchema()
@@ -789,7 +789,7 @@ func TestStateGraphTyped_CommandGoto(t *testing.T) {
 
 func TestStateGraphTyped_CommandGotoMultiple(t *testing.T) {
 	// Use any type to allow returning Command
-	g := NewStateGraphTyped[any]()
+	g := NewStateGraph[any]()
 
 	// Create a typed schema adapter for map[string]any
 	mapSchema := NewMapSchema()

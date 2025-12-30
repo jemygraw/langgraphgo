@@ -22,6 +22,23 @@ func NewParallelNode(name string, nodes ...Node) *ParallelNode {
 
 // Execute runs all nodes in parallel and collects results
 func (pn *ParallelNode) Execute(ctx context.Context, state any) (any, error) {
+	// Extract actual state if it's wrapped in map[string]any
+	var actualState any
+	if stateMap, ok := state.(map[string]any); ok {
+		// Try to extract from common keys
+		if val, exists := stateMap["input"]; exists {
+			actualState = val
+		} else if val, exists := stateMap["state"]; exists {
+			actualState = val
+		} else if val, exists := stateMap["value"]; exists {
+			actualState = val
+		} else {
+			actualState = state
+		}
+	} else {
+		actualState = state
+	}
+
 	// Create channels for results and errors
 	type result struct {
 		index int
@@ -48,7 +65,7 @@ func (pn *ParallelNode) Execute(ctx context.Context, state any) (any, error) {
 				}
 			}()
 
-			value, err := n.Function(ctx, state)
+			value, err := n.Function(ctx, actualState)
 			results <- result{
 				index: idx,
 				value: value,
@@ -83,7 +100,7 @@ func (pn *ParallelNode) Execute(ctx context.Context, state any) (any, error) {
 }
 
 // AddParallelNodes adds a set of nodes that execute in parallel
-func (g *StateGraph) AddParallelNodes(groupName string, nodes map[string]func(context.Context, any) (any, error)) {
+func (g *StateGraphUntyped) AddParallelNodes(groupName string, nodes map[string]func(context.Context, any) (any, error)) {
 	// Create parallel node group
 	parallelNodes := make([]Node, 0, len(nodes))
 	for name, fn := range nodes {
@@ -93,9 +110,9 @@ func (g *StateGraph) AddParallelNodes(groupName string, nodes map[string]func(co
 		})
 	}
 
-	// Add as a single parallel node
+	// Add as a single parallel node using AddNodeUntyped for compatibility
 	parallelNode := NewParallelNode(groupName, parallelNodes...)
-	g.AddNode(groupName, "Parallel execution group: "+groupName, parallelNode.Execute)
+	g.AddNodeUntyped(groupName, "Parallel execution group: "+groupName, parallelNode.Execute)
 }
 
 // MapReduceNode executes nodes in parallel and reduces results
@@ -116,9 +133,26 @@ func NewMapReduceNode(name string, reducer func([]any) (any, error), mapNodes ..
 
 // Execute runs map nodes in parallel and reduces results
 func (mr *MapReduceNode) Execute(ctx context.Context, state any) (any, error) {
+	// Extract actual state if it's wrapped in map[string]any
+	var actualState any
+	if stateMap, ok := state.(map[string]any); ok {
+		// Try to extract from common keys
+		if val, exists := stateMap["input"]; exists {
+			actualState = val
+		} else if val, exists := stateMap["state"]; exists {
+			actualState = val
+		} else if val, exists := stateMap["value"]; exists {
+			actualState = val
+		} else {
+			actualState = state
+		}
+	} else {
+		actualState = state
+	}
+
 	// Execute map phase in parallel
 	pn := NewParallelNode(mr.name+"_map", mr.mapNodes...)
-	results, err := pn.Execute(ctx, state)
+	results, err := pn.Execute(ctx, actualState)
 	if err != nil {
 		return nil, fmt.Errorf("map phase failed: %w", err)
 	}
@@ -132,7 +166,7 @@ func (mr *MapReduceNode) Execute(ctx context.Context, state any) (any, error) {
 }
 
 // AddMapReduceNode adds a map-reduce pattern node
-func (g *StateGraph) AddMapReduceNode(
+func (g *StateGraphUntyped) AddMapReduceNode(
 	name string,
 	mapFunctions map[string]func(context.Context, any) (any, error),
 	reducer func([]any) (any, error),
@@ -148,11 +182,11 @@ func (g *StateGraph) AddMapReduceNode(
 
 	// Create and add map-reduce node
 	mrNode := NewMapReduceNode(name, reducer, mapNodes...)
-	g.AddNode(name, "Map-reduce node: "+name, mrNode.Execute)
+	g.AddNodeUntyped(name, "Map-reduce node: "+name, mrNode.Execute)
 }
 
 // FanOutFanIn creates a fan-out/fan-in pattern
-func (g *StateGraph) FanOutFanIn(
+func (g *StateGraphUntyped) FanOutFanIn(
 	source string,
 	_ []string, // workers parameter kept for API compatibility
 	collector string,
@@ -163,12 +197,29 @@ func (g *StateGraph) FanOutFanIn(
 	g.AddParallelNodes(source+"_workers", workerFuncs)
 
 	// Add collector node
-	g.AddNode(collector, "Collector node: "+collector, func(_ context.Context, state any) (any, error) {
+	g.AddNodeUntyped(collector, "Collector node: "+collector, func(_ context.Context, state any) (any, error) {
 		// State should be array of results from parallel workers
-		if results, ok := state.([]any); ok {
+		// AddNodeUntyped wraps input as map[string]any, so we need to extract the actual results
+		var results []any
+		if stateMap, ok := state.(map[string]any); ok {
+			// Try to get results from common keys
+			if val, exists := stateMap["value"]; exists {
+				if arr, ok := val.([]any); ok {
+					results = arr
+				}
+			} else if val, exists := stateMap["results"]; exists {
+				if arr, ok := val.([]any); ok {
+					results = arr
+				}
+			}
+		} else if arr, ok := state.([]any); ok {
+			results = arr
+		}
+
+		if results != nil {
 			return collectFunc(results)
 		}
-		return nil, fmt.Errorf("invalid state for collector: expected []any")
+		return nil, fmt.Errorf("invalid state for collector: expected []any, got %T", state)
 	})
 
 	// Connect source to workers and workers to collector

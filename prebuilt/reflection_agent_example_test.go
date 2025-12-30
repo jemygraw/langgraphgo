@@ -48,8 +48,7 @@ func ExampleCreateReflectionAgent() {
 	}
 
 	// Extract final response
-	finalState := result.(map[string]any)
-	messages := finalState["messages"].([]llms.MessageContent)
+	messages := result["messages"].([]llms.MessageContent)
 
 	fmt.Println("=== Final Response ===")
 	for _, msg := range messages {
@@ -112,9 +111,8 @@ Be specific in your feedback.`,
 		log.Fatal(err)
 	}
 
-	finalState := result.(map[string]any)
-	draft := finalState["draft"].(string)
-	iteration := finalState["iteration"].(int)
+	draft := result["draft"].(string)
+	iteration := result["iteration"].(int)
 
 	fmt.Printf("Final draft (after %d iterations):\n%s\n", iteration, draft)
 }
@@ -159,7 +157,6 @@ Provide specific, actionable feedback.`,
 		log.Fatal(err)
 	}
 
-	finalState := result.(map[string]any)
-	draft := finalState["draft"].(string)
+	draft := result["draft"].(string)
 	fmt.Printf("Code review:\n%s\n", draft)
 }

@@ -5,11 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 )
 
-// StateGraphTyped represents a generic state-based graph with compile-time type safety.
+// StateGraph represents a generic state-based graph with compile-time type safety.
 // The type parameter S represents the state type, which is typically a struct.
 //
 // Example usage:
@@ -19,14 +20,14 @@ import (
 //	    Name  string
 //	}
 //
-//	g := graph.NewStateGraphTyped[MyState]()
+//	g := graph.NewStateGraph[MyState]()
 //	g.AddNode("increment", "Increment counter", func(ctx context.Context, state MyState) (MyState, error) {
 //	    state.Count++
 //	    return state, nil
 //	})
-type StateGraphTyped[S any] struct {
+type StateGraph[S any] struct {
 	// nodes is a map of node names to their corresponding Node objects
-	nodes map[string]NodeTyped[S]
+	nodes map[string]TypedNode[S]
 
 	// edges is a slice of Edge objects representing the connections between nodes
 	edges []Edge
@@ -41,31 +42,31 @@ type StateGraphTyped[S any] struct {
 	retryPolicy *RetryPolicy
 
 	// stateMerger is an optional function to merge states from parallel execution
-	stateMerger StateMergerTyped[S]
+	stateMerger TypedStateMerger[S]
 
 	// Schema defines the state structure and update logic
 	Schema StateSchemaTyped[S]
 }
 
-// NodeTyped represents a typed node in the graph.
-type NodeTyped[S any] struct {
+// TypedNode represents a typed node in the graph.
+type TypedNode[S any] struct {
 	Name        string
 	Description string
 	Function    func(ctx context.Context, state S) (S, error)
 }
 
-// StateMergerTyped is a typed function to merge states from parallel execution.
-type StateMergerTyped[S any] func(ctx context.Context, currentState S, newStates []S) (S, error)
+// StateMerger is a typed function to merge states from parallel execution.
+type TypedStateMerger[S any] func(ctx context.Context, currentState S, newStates []S) (S, error)
 
-// NewStateGraphTyped creates a new instance of StateGraphTyped with type safety.
+// NewStateGraph creates a new instance of StateGraph with type safety.
 // The type parameter S specifies the state type.
 //
 // Example:
 //
-//	g := graph.NewStateGraphTyped[MyState]()
-func NewStateGraphTyped[S any]() *StateGraphTyped[S] {
-	return &StateGraphTyped[S]{
-		nodes:            make(map[string]NodeTyped[S]),
+//	g := graph.NewStateGraph[MyState]()
+func NewStateGraph[S any]() *StateGraph[S] {
+	return &StateGraph[S]{
+		nodes:            make(map[string]TypedNode[S]),
 		conditionalEdges: make(map[string]func(ctx context.Context, state S) string),
 	}
 }
@@ -79,8 +80,8 @@ func NewStateGraphTyped[S any]() *StateGraphTyped[S] {
 //	    state.Count++  // Type-safe access!
 //	    return state, nil
 //	})
-func (g *StateGraphTyped[S]) AddNode(name string, description string, fn func(ctx context.Context, state S) (S, error)) {
-	g.nodes[name] = NodeTyped[S]{
+func (g *StateGraph[S]) AddNode(name string, description string, fn func(ctx context.Context, state S) (S, error)) {
+	g.nodes[name] = TypedNode[S]{
 		Name:        name,
 		Description: description,
 		Function:    fn,
@@ -88,7 +89,7 @@ func (g *StateGraphTyped[S]) AddNode(name string, description string, fn func(ct
 }
 
 // AddEdge adds a new edge to the state graph between the "from" and "to" nodes.
-func (g *StateGraphTyped[S]) AddEdge(from, to string) {
+func (g *StateGraph[S]) AddEdge(from, to string) {
 	g.edges = append(g.edges, Edge{
 		From: from,
 		To:   to,
@@ -106,57 +107,62 @@ func (g *StateGraphTyped[S]) AddEdge(from, to string) {
 //	    }
 //	    return "low"
 //	})
-func (g *StateGraphTyped[S]) AddConditionalEdge(from string, condition func(ctx context.Context, state S) string) {
+func (g *StateGraph[S]) AddConditionalEdge(from string, condition func(ctx context.Context, state S) string) {
 	g.conditionalEdges[from] = condition
 }
 
 // SetEntryPoint sets the entry point node name for the state graph.
-func (g *StateGraphTyped[S]) SetEntryPoint(name string) {
+func (g *StateGraph[S]) SetEntryPoint(name string) {
 	g.entryPoint = name
 }
 
 // SetRetryPolicy sets the retry policy for the graph.
-func (g *StateGraphTyped[S]) SetRetryPolicy(policy *RetryPolicy) {
+func (g *StateGraph[S]) SetRetryPolicy(policy *RetryPolicy) {
 	g.retryPolicy = policy
 }
 
 // SetStateMerger sets the state merger function for the state graph.
-func (g *StateGraphTyped[S]) SetStateMerger(merger StateMergerTyped[S]) {
+func (g *StateGraph[S]) SetStateMerger(merger TypedStateMerger[S]) {
 	g.stateMerger = merger
 }
 
 // SetSchema sets the state schema for the graph.
-func (g *StateGraphTyped[S]) SetSchema(schema StateSchemaTyped[S]) {
+func (g *StateGraph[S]) SetSchema(schema StateSchemaTyped[S]) {
 	g.Schema = schema
 }
 
-// StateRunnableTyped represents a compiled state graph that can be invoked with type safety.
-type StateRunnableTyped[S any] struct {
-	graph      *StateGraphTyped[S]
+// StateRunnable represents a compiled state graph that can be invoked with type safety.
+type StateRunnable[S any] struct {
+	graph      *StateGraph[S]
 	tracer     *Tracer
 	nodeRunner func(ctx context.Context, nodeName string, state S) (S, error)
 }
 
-// Compile compiles the state graph and returns a StateRunnableTyped instance.
-func (g *StateGraphTyped[S]) Compile() (*StateRunnableTyped[S], error) {
+// Compile compiles the state graph and returns a StateRunnable instance.
+func (g *StateGraph[S]) Compile() (*StateRunnable[S], error) {
 	if g.entryPoint == "" {
 		return nil, ErrEntryPointNotSet
 	}
 
-	return &StateRunnableTyped[S]{
+	return &StateRunnable[S]{
 		graph:  g,
 		tracer: nil, // Initialize with no tracer
 	}, nil
 }
 
 // SetTracer sets a tracer for observability.
-func (r *StateRunnableTyped[S]) SetTracer(tracer *Tracer) {
+func (r *StateRunnable[S]) SetTracer(tracer *Tracer) {
 	r.tracer = tracer
 }
 
-// WithTracer returns a new StateRunnableTyped with the given tracer.
-func (r *StateRunnableTyped[S]) WithTracer(tracer *Tracer) *StateRunnableTyped[S] {
-	return &StateRunnableTyped[S]{
+// GetTracer returns the current tracer.
+func (r *StateRunnable[S]) GetTracer() *Tracer {
+	return r.tracer
+}
+
+// WithTracer returns a new StateRunnable with the given tracer.
+func (r *StateRunnable[S]) WithTracer(tracer *Tracer) *StateRunnable[S] {
+	return &StateRunnable[S]{
 		graph:  r.graph,
 		tracer: tracer,
 	}
@@ -170,12 +176,12 @@ func (r *StateRunnableTyped[S]) WithTracer(tracer *Tracer) *StateRunnableTyped[S
 //	initialState := MyState{Count: 0}
 //	finalState, err := app.Invoke(ctx, initialState)
 //	// finalState is MyState type - no casting needed!
-func (r *StateRunnableTyped[S]) Invoke(ctx context.Context, initialState S) (S, error) {
+func (r *StateRunnable[S]) Invoke(ctx context.Context, initialState S) (S, error) {
 	return r.InvokeWithConfig(ctx, initialState, nil)
 }
 
 // InvokeWithConfig executes the compiled state graph with the given input state and config.
-func (r *StateRunnableTyped[S]) InvokeWithConfig(ctx context.Context, initialState S, config *Config) (S, error) {
+func (r *StateRunnable[S]) InvokeWithConfig(ctx context.Context, initialState S, config *Config) (S, error) {
 	state := initialState
 
 	// If schema is defined, merge initialState into schema's initial state
@@ -351,7 +357,7 @@ func (r *StateRunnableTyped[S]) InvokeWithConfig(ctx context.Context, initialSta
 }
 
 // executeNodeWithRetry executes a node with retry logic based on the retry policy.
-func (r *StateRunnableTyped[S]) executeNodeWithRetry(ctx context.Context, node NodeTyped[S], state S) (S, error) {
+func (r *StateRunnable[S]) executeNodeWithRetry(ctx context.Context, node TypedNode[S], state S) (S, error) {
 	var lastErr error
 	var zero S
 
@@ -402,14 +408,14 @@ func (r *StateRunnableTyped[S]) executeNodeWithRetry(ctx context.Context, node N
 }
 
 // isRetryableError checks if an error is retryable based on the retry policy.
-func (r *StateRunnableTyped[S]) isRetryableError(err error) bool {
+func (r *StateRunnable[S]) isRetryableError(err error) bool {
 	if r.graph.retryPolicy == nil {
 		return false
 	}
 
 	errorStr := err.Error()
 	for _, retryablePattern := range r.graph.retryPolicy.RetryableErrors {
-		if contains(errorStr, retryablePattern) {
+		if strings.Contains(errorStr, retryablePattern) {
 			return true
 		}
 	}
@@ -418,7 +424,7 @@ func (r *StateRunnableTyped[S]) isRetryableError(err error) bool {
 }
 
 // calculateBackoffDelay calculates the delay for retry based on the backoff strategy.
-func (r *StateRunnableTyped[S]) calculateBackoffDelay(attempt int) time.Duration {
+func (r *StateRunnable[S]) calculateBackoffDelay(attempt int) time.Duration {
 	if r.graph.retryPolicy == nil {
 		return 0
 	}
@@ -440,7 +446,7 @@ func (r *StateRunnableTyped[S]) calculateBackoffDelay(attempt int) time.Duration
 }
 
 // executeNodesParallel executes valid nodes in parallel and returns their results or errors.
-func (r *StateRunnableTyped[S]) executeNodesParallel(ctx context.Context, nodes []string, state S, config *Config, runID string) ([]S, []error) {
+func (r *StateRunnable[S]) executeNodesParallel(ctx context.Context, nodes []string, state S, config *Config, runID string) ([]S, []error) {
 	var wg sync.WaitGroup
 	results := make([]S, len(nodes))
 	errorsList := make([]error, len(nodes))
@@ -517,7 +523,7 @@ func (r *StateRunnableTyped[S]) executeNodesParallel(ctx context.Context, nodes 
 }
 
 // processNodeResults processes the raw results from nodes, handling Commands.
-func (r *StateRunnableTyped[S]) processNodeResults(results []S) ([]S, []string) {
+func (r *StateRunnable[S]) processNodeResults(results []S) ([]S, []string) {
 	var nextNodesFromCommands []string
 	processedResults := make([]S, len(results))
 
@@ -560,7 +566,7 @@ func (r *StateRunnableTyped[S]) processNodeResults(results []S) ([]S, []string) 
 }
 
 // mergeState merges the processed results into the current state.
-func (r *StateRunnableTyped[S]) mergeState(ctx context.Context, currentState S, results []S) (S, error) {
+func (r *StateRunnable[S]) mergeState(ctx context.Context, currentState S, results []S) (S, error) {
 	state := currentState
 	if r.graph.Schema != nil {
 		// If Schema is defined, use it to update state with results
@@ -588,7 +594,7 @@ func (r *StateRunnableTyped[S]) mergeState(ctx context.Context, currentState S, 
 }
 
 // determineNextNodes determines the next nodes to execute based on static edges, conditional edges, or commands.
-func (r *StateRunnableTyped[S]) determineNextNodes(ctx context.Context, currentNodes []string, state S, nextNodesFromCommands []string) ([]string, error) {
+func (r *StateRunnable[S]) determineNextNodes(ctx context.Context, currentNodes []string, state S, nextNodesFromCommands []string) ([]string, error) {
 	var nextNodesList []string
 
 	if len(nextNodesFromCommands) > 0 {

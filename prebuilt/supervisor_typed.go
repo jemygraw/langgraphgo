@@ -17,8 +17,8 @@ type SupervisorState struct {
 }
 
 // CreateSupervisorTyped creates a typed supervisor graph that orchestrates multiple agents
-func CreateSupervisorTyped(model llms.Model, members map[string]*graph.StateRunnableTyped[SupervisorState]) (*graph.StateRunnableTyped[SupervisorState], error) {
-	workflow := graph.NewStateGraphTyped[SupervisorState]()
+func CreateSupervisorTyped(model llms.Model, members map[string]*graph.StateRunnable[SupervisorState]) (*graph.StateRunnable[SupervisorState], error) {
+	workflow := graph.NewStateGraph[SupervisorState]()
 
 	// Define state schema with merge logic
 	schema := graph.NewStructSchema(
@@ -143,13 +143,13 @@ func CreateSupervisorTyped(model llms.Model, members map[string]*graph.StateRunn
 // CreateSupervisorWithStateTyped creates a typed supervisor with custom state type
 func CreateSupervisorWithStateTyped[S any](
 	model llms.Model,
-	members map[string]*graph.StateRunnableTyped[S],
+	members map[string]*graph.StateRunnable[S],
 	getMessages func(S) []llms.MessageContent,
 	updateMessages func(S, []llms.MessageContent) S,
 	getNext func(S) string,
 	setNext func(S, string) S,
-) (*graph.StateRunnableTyped[S], error) {
-	workflow := graph.NewStateGraphTyped[S]()
+) (*graph.StateRunnable[S], error) {
+	workflow := graph.NewStateGraph[S]()
 
 	// Get member names
 	var memberNames []string

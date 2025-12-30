@@ -72,22 +72,28 @@ func CreatePTCAgent(config PTCAgentConfig) (*graph.Runnable, error) {
 	workflow := graph.NewMessageGraph()
 
 	// Add agent node
-	workflow.AddNode("agent", "LLM agent that generates code for tool calling", func(ctx context.Context, state any) (any, error) {
+	workflow.AddNode("agent", "LLM agent that generates code for tool calling", func(ctx context.Context, state map[string]any) (map[string]any, error) {
 		return agentNode(ctx, state, config.Model, systemPrompt, config.MaxIterations)
 	})
 
 	// Add PTC execution node
-	workflow.AddNode("execute_code", "Executes generated code with tool access", func(ctx context.Context, state any) (any, error) {
-		return ptcNode.Invoke(ctx, state)
+	workflow.AddNode("execute_code", "Executes generated code with tool access", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		result, err := ptcNode.Invoke(ctx, state)
+		if err != nil {
+			return nil, err
+		}
+		if resultMap, ok := result.(map[string]any); ok {
+			return resultMap, nil
+		}
+		return state, nil
 	})
 
 	// Set entry point
 	workflow.SetEntryPoint("agent")
 
 	// Add conditional routing
-	workflow.AddConditionalEdge("agent", func(ctx context.Context, state any) string {
-		mState := state.(map[string]any)
-		messages := mState["messages"].([]llms.MessageContent)
+	workflow.AddConditionalEdge("agent", func(ctx context.Context, state map[string]any) string {
+		messages := state["messages"].([]llms.MessageContent)
 
 		if len(messages) == 0 {
 			return graph.END
@@ -117,13 +123,12 @@ func CreatePTCAgent(config PTCAgentConfig) (*graph.Runnable, error) {
 }
 
 // agentNode is the main agent logic node
-func agentNode(ctx context.Context, state any, model llms.Model, systemPrompt string, maxIterations int) (any, error) {
-	mState := state.(map[string]any)
-	messages := mState["messages"].([]llms.MessageContent)
+func agentNode(ctx context.Context, state map[string]any, model llms.Model, systemPrompt string, maxIterations int) (map[string]any, error) {
+	messages := state["messages"].([]llms.MessageContent)
 
 	// Check iteration count
 	iterationCount := 0
-	if count, ok := mState["iteration_count"].(int); ok {
+	if count, ok := state["iteration_count"].(int); ok {
 		iterationCount = count
 	}
 
@@ -135,12 +140,12 @@ func agentNode(ctx context.Context, state any, model llms.Model, systemPrompt st
 				llms.TextPart("Maximum iterations reached. Please try a simpler query."),
 			},
 		}
-		mState["messages"] = []llms.MessageContent{finalMsg}
-		return mState, nil
+		state["messages"] = []llms.MessageContent{finalMsg}
+		return state, nil
 	}
 
 	// Increment iteration count
-	mState["iteration_count"] = iterationCount + 1
+	state["iteration_count"] = iterationCount + 1
 
 	// Prepend system message if not already present
 	if len(messages) == 0 || messages[0].Role != llms.ChatMessageTypeSystem {
@@ -177,9 +182,9 @@ func agentNode(ctx context.Context, state any, model llms.Model, systemPrompt st
 		Role:  llms.ChatMessageTypeAI,
 		Parts: responseContent,
 	}
-	mState["messages"] = append(mState["messages"].([]llms.MessageContent), aiMsg)
+	state["messages"] = append(state["messages"].([]llms.MessageContent), aiMsg)
 
-	return mState, nil
+	return state, nil
 }
 
 // buildSystemPrompt builds the system prompt with tool definitions

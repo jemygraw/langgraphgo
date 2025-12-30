@@ -70,10 +70,8 @@ func TestCreateReflectionAgent(t *testing.T) {
 		t.Fatalf("Failed to invoke agent: %v", err)
 	}
 
-	finalState := result.(map[string]any)
-
 	// Verify final state has messages
-	messages, ok := finalState["messages"].([]llms.MessageContent)
+	messages, ok := result["messages"].([]llms.MessageContent)
 	if !ok {
 		t.Fatal("Final state does not contain messages")
 	}
@@ -83,13 +81,13 @@ func TestCreateReflectionAgent(t *testing.T) {
 	}
 
 	// Verify we have a draft
-	_, ok = finalState["draft"].(string)
+	_, ok = result["draft"].(string)
 	if !ok {
 		t.Fatal("Final state does not contain draft")
 	}
 
 	// Verify iterations occurred
-	iteration, ok := finalState["iteration"].(int)
+	iteration, ok := result["iteration"].(int)
 	if !ok {
 		t.Fatal("Final state does not contain iteration count")
 	}
@@ -146,8 +144,7 @@ func TestReflectionAgentMaxIterations(t *testing.T) {
 		t.Fatalf("Failed to invoke agent: %v", err)
 	}
 
-	finalState := result.(map[string]any)
-	iteration := finalState["iteration"].(int)
+	iteration := result["iteration"].(int)
 
 	// Should stop at max iterations
 	if iteration > 2 {

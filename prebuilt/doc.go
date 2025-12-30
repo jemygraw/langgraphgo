@@ -63,7 +63,7 @@
 //	searchAgent, _ := prebuilt.CreateReactAgent(llm, searchTools, 5)
 //
 //	// Create supervisor
-//	members := map[string]*graph.StateRunnable{
+//	members := map[string]*graph.StateRunnableUntyped
 //		"weather": weatherAgent,
 //		"calculator": calcAgent,
 //		"search": searchAgent,

@@ -238,7 +238,7 @@
 //		ConnString: "postgres://...",
 //	})
 //
-//	members := map[string]*graph.StateRunnable{
+//	members := map[string]*graph.StateRunnableUntyped
 //		"worker1": worker1,
 //		"worker2": worker2,
 //	}

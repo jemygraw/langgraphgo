@@ -82,7 +82,7 @@ func TestProgressListener_WithDetails(t *testing.T) {
 		WithDetails(true)
 
 	ctx := context.Background()
-	state := map[string]string{"key": "value"}
+	state := map[string]any{"key": "value"}
 
 	listener.OnNodeEvent(ctx, graph.NodeEventComplete, "test_node", state, nil)
 
@@ -162,12 +162,13 @@ func TestLoggingListener_WithState(t *testing.T) {
 		WithState(true)
 
 	ctx := context.Background()
-	state := testState
+	state := map[string]any{"state": testState}
 
 	listener.OnNodeEvent(ctx, graph.NodeEventComplete, "test_node", state, nil)
 
 	output := buf.String()
-	if !strings.Contains(output, "State: test_state") {
+	// State is now map[string]any{"state": "test_state"}
+	if !strings.Contains(output, "State: map[state:test_state]") {
 		t.Errorf("Expected state in log, got: %s", output)
 	}
 }
@@ -347,14 +348,16 @@ func TestBuiltinListeners_Integration(t *testing.T) {
 	t.Parallel()
 
 	// Create graph
-	g := graph.NewListenableStateGraph()
+	g := graph.NewListenableStateGraphUntyped()
 
-	node1 := g.AddNode("step1", "step1", func(_ context.Context, _ any) (any, error) {
-		return "step1_result", nil
+	node1 := g.AddNodeUntyped("step1", "step1", func(_ context.Context, state any) (any, error) {
+		// Return updated state map
+		return map[string]any{"state": "step1_result"}, nil
 	})
 
-	node2 := g.AddNode("step2", "step2", func(_ context.Context, _ any) (any, error) {
-		return step2Result, nil
+	node2 := g.AddNodeUntyped("step2", "step2", func(_ context.Context, state any) (any, error) {
+		// Return updated state map
+		return map[string]any{"state": step2Result}, nil
 	})
 
 	g.AddEdge("step1", "step2")
@@ -379,20 +382,22 @@ func TestBuiltinListeners_Integration(t *testing.T) {
 	node2.AddListener(chatListener)
 	node2.AddListener(metricsListener)
 
-	// Execute graph
+	// Execute graph - pass input as map to avoid wrapping
 	runnable, err := g.CompileListenable()
 	if err != nil {
 		t.Fatalf("Failed to compile: %v", err)
 	}
 
 	ctx := context.Background()
-	result, err := runnable.Invoke(ctx, "input")
+	result, err := runnable.Invoke(ctx, map[string]any{"state": "input"})
 	if err != nil {
 		t.Fatalf("Execution failed: %v", err)
 	}
 
-	if result != step2Result {
-		t.Errorf("Expected 'step2_result', got %v", result)
+	// result is already map[string]any
+	actualResult := result["state"]
+	if actualResult != step2Result {
+		t.Errorf("Expected 'step2_result', got %v", actualResult)
 	}
 
 	// Wait for async listeners

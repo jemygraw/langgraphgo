@@ -53,8 +53,8 @@ func runCLI(username string) {
 		log.Fatalf("创建图失败: %v", err)
 	}
 
-	initialState := &graph.State{
-		Username: username,
+	initialState := map[string]any{
+		"username": username,
 	}
 
 	res, err := g.Invoke(ctx, initialState)
@@ -62,13 +62,9 @@ func runCLI(username string) {
 		log.Fatalf("运行图失败: %v", err)
 	}
 
-	finalState, ok := res.(*graph.State)
-	if !ok {
-		log.Fatalf("无法将结果转换为 *State")
-	}
-
+	profileText, _ := res["profile_text"].(string)
 	fmt.Println("\n=== 生成的画像 ===")
-	fmt.Println(finalState.ProfileText)
+	fmt.Println(profileText)
 }
 
 func runWeb(addr string) {
@@ -138,9 +134,9 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 	logChan := make(chan string, 10)
 	ctx := context.Background()
 
-	initialState := &graph.State{
-		Username: username,
-		LogChan:  logChan,
+	initialState := map[string]any{
+		"username": username,
+		"log_chan": logChan,
 	}
 
 	resultChan := make(chan string, 1)
@@ -161,11 +157,6 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		finalState, ok := res.(*graph.State)
-		if !ok {
-			logChan <- "Error: 无法将结果转换为 *State"
-			return
-		}
 		// 渲染结果 HTML
 		tmpl, err := template.ParseFS(webFS, "web/templates/index.html")
 		if err != nil {
@@ -173,10 +164,13 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		profileText, _ := res["profile_text"].(string)
+		socialData, _ := res["social_data"].([]graph.Result)
+
 		// Convert Markdown to HTML
 		extensions := parser.CommonExtensions | parser.AutoHeadingIDs
 		p := parser.NewWithExtensions(extensions)
-		doc := p.Parse([]byte(finalState.ProfileText))
+		doc := p.Parse([]byte(profileText))
 
 		htmlFlags := html.CommonFlags | html.HrefTargetBlank
 		opts := html.RendererOptions{Flags: htmlFlags}
@@ -195,9 +189,9 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 			Results     any
 		}{
 			Username:    username,
-			Profile:     finalState.ProfileText,
+			Profile:     profileText,
 			ProfileHTML: template.HTML(htmlBytes), // #nosec G203
-			Results:     finalState.SocialData,
+			Results:     socialData,
 		}
 
 		if err := tmpl.ExecuteTemplate(&sb, "result", data); err != nil {

@@ -129,8 +129,7 @@ func TestReactAgentWithWeatherTool(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify Result
-	mState := res.(map[string]any)
-	messages := mState["messages"].([]llms.MessageContent)
+	messages := res["messages"].([]llms.MessageContent)
 
 	// Expected messages:
 	// 0: Human query about Beijing weather
@@ -229,8 +228,7 @@ func TestReactAgentWithMultipleWeatherQueries(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify Result
-	mState := res.(map[string]any)
-	messages := mState["messages"].([]llms.MessageContent)
+	messages := res["messages"].([]llms.MessageContent)
 
 	// Expected 6 messages:
 	// 0: Human query
@@ -325,8 +323,7 @@ func TestReactAgentWithInternationalWeather(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify Result
-	mState := res.(map[string]any)
-	messages := mState["messages"].([]llms.MessageContent)
+	messages := res["messages"].([]llms.MessageContent)
 
 	assert.Equal(t, 6, len(messages))
 
@@ -392,8 +389,7 @@ func TestReactAgentMaxIterations(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify Result
-	mState := res.(map[string]any)
-	messages := mState["messages"].([]llms.MessageContent)
+	messages := res["messages"].([]llms.MessageContent)
 
 	// Should have exactly 4 messages: Human -> AI(toolcall) -> Tool -> AI(answer)
 	assert.Equal(t, 4, len(messages))
@@ -452,8 +448,7 @@ func TestReactAgentDirectAnswer(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify Result
-	mState := res.(map[string]any)
-	messages := mState["messages"].([]llms.MessageContent)
+	messages := res["messages"].([]llms.MessageContent)
 
 	// Expected 2 messages:
 	// 0: Human query
@@ -519,8 +514,7 @@ func TestReactAgentErrorHandling(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify Result
-	mState := res.(map[string]any)
-	messages := mState["messages"].([]llms.MessageContent)
+	messages := res["messages"].([]llms.MessageContent)
 
 	// Should have 4 messages even with error
 	assert.Equal(t, 4, len(messages))
@@ -579,8 +573,7 @@ func TestCreateReactAgent(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify Result
-	mState := res.(map[string]any)
-	messages := mState["messages"].([]llms.MessageContent)
+	messages := res["messages"].([]llms.MessageContent)
 
 	assert.Equal(t, 4, len(messages))
 	assert.Equal(t, "Legacy test completed", messages[3].Parts[0].(llms.TextContent).Text)

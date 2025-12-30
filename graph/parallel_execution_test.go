@@ -3,57 +3,52 @@ package graph
 import (
 	"context"
 	"maps"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
+// appendVisitors is a helper function that appends a node name to the visited list in the state.
+func appendVisitors(state map[string]any, node string) []string {
+	visited, ok := state["visited"].([]string)
+	if !ok {
+		visited = []string{}
+	}
+	return append(visited, node)
+}
+
 func TestParallelExecution_FanOut(t *testing.T) {
-	// Define a simple state as a map to track execution
-	type State struct {
-		Visited []string
-		mu      sync.Mutex
-	}
-
-	// Helper to append visited nodes safely
-	visit := func(s *State, node string) {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		s.Visited = append(s.Visited, node)
-	}
-
-	g := NewStateGraph()
+	g := NewStateGraph[map[string]any]()
 
 	// Node A: Entry point
-	g.AddNode("A", "A", func(ctx context.Context, state any) (any, error) {
-		s := state.(*State)
-		visit(s, "A")
-		return s, nil
+	g.AddNode("A", "A", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		visited := appendVisitors(state, "A")
+		state["visited"] = visited
+		return state, nil
 	})
 
 	// Node B: Branch 1
-	g.AddNode("B", "B", func(ctx context.Context, state any) (any, error) {
-		s := state.(*State)
-		visit(s, "B")
+	g.AddNode("B", "B", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		visited := appendVisitors(state, "B")
+		state["visited"] = visited
 		time.Sleep(10 * time.Millisecond) // Simulate work
-		return s, nil
+		return state, nil
 	})
 
 	// Node C: Branch 2
-	g.AddNode("C", "C", func(ctx context.Context, state any) (any, error) {
-		s := state.(*State)
-		visit(s, "C")
+	g.AddNode("C", "C", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		visited := appendVisitors(state, "C")
+		state["visited"] = visited
 		time.Sleep(10 * time.Millisecond) // Simulate work
-		return s, nil
+		return state, nil
 	})
 
 	// Node D: Join point
-	g.AddNode("D", "D", func(ctx context.Context, state any) (any, error) {
-		s := state.(*State)
-		visit(s, "D")
-		return s, nil
+	g.AddNode("D", "D", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		visited := appendVisitors(state, "D")
+		state["visited"] = visited
+		return state, nil
 	})
 
 	g.SetEntryPoint("A")
@@ -68,27 +63,44 @@ func TestParallelExecution_FanOut(t *testing.T) {
 
 	g.AddEdge("D", END)
 
+	// Set state merger for parallel execution
+	g.SetStateMerger(func(ctx context.Context, current map[string]any, newStates []map[string]any) (map[string]any, error) {
+		// Collect all visited nodes from all states
+		visitedSet := make(map[string]bool)
+		for _, s := range newStates {
+			if v, ok := s["visited"].([]string); ok {
+				for _, node := range v {
+					visitedSet[node] = true
+				}
+			}
+		}
+		// Convert to sorted slice for deterministic output
+		visited := make([]string, 0, len(visitedSet))
+		for node := range visitedSet {
+			visited = append(visited, node)
+		}
+		result := make(map[string]any)
+		for k, v := range current {
+			result[k] = v
+		}
+		result["visited"] = visited
+		return result, nil
+	})
+
 	// Compile
 	runnable, err := g.Compile()
 	assert.NoError(t, err)
 
 	// Execute
-	initialState := &State{Visited: []string{}}
+	initialState := map[string]any{
+		"visited": []string{},
+	}
 
-	// We need a custom merger for this to work in the new implementation,
-	// but for now we just want to see if it runs both B and C.
-	// Since the state is a pointer, updates are shared (not thread safe if we didn't use mutex).
-	// But the graph execution logic currently only picks ONE path.
-
-	_, err = runnable.Invoke(context.Background(), initialState)
+	result, err := runnable.Invoke(context.Background(), initialState)
 	assert.NoError(t, err)
 
 	// Check results
-	// Expected: A, then (B and C in any order), then D (maybe twice or once depending on implementation)
-	// Current implementation will likely do: A -> B -> D -> END (skipping C)
-	// or A -> C -> D -> END (skipping B)
-
-	visited := initialState.Visited
+	visited := result["visited"].([]string)
 	assert.Contains(t, visited, "A")
 	assert.Contains(t, visited, "D")
 
@@ -109,43 +121,39 @@ func TestParallelExecution_FanOut(t *testing.T) {
 }
 
 func TestStateGraph_ParallelExecution(t *testing.T) {
-	g := NewStateGraph()
-
-	// State is map[string]int
-	type State map[string]int
+	g := NewStateGraph[map[string]any]()
 
 	// Merger function
-	merger := func(ctx context.Context, current any, newStates []any) (any, error) {
-		merged := make(State)
+	merger := func(ctx context.Context, current map[string]any, newStates []map[string]any) (map[string]any, error) {
+		merged := make(map[string]any)
 		// Copy current
-		maps.Copy(merged, current.(State))
+		maps.Copy(merged, current)
 		// Merge new states
 		for _, s := range newStates {
-			ns := s.(State)
-			maps.Copy(merged, ns)
+			maps.Copy(merged, s)
 		}
 		return merged, nil
 	}
 	g.SetStateMerger(merger)
 
-	g.AddNode("A", "A", func(ctx context.Context, state any) (any, error) {
-		s := make(State)
-		maps.Copy(s, state.(State))
+	g.AddNode("A", "A", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		s := make(map[string]any)
+		maps.Copy(s, state)
 		s["A"] = 1
 		return s, nil
 	})
 
-	g.AddNode("B", "B", func(ctx context.Context, state any) (any, error) {
-		s := make(State)
-		maps.Copy(s, state.(State))
+	g.AddNode("B", "B", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		s := make(map[string]any)
+		maps.Copy(s, state)
 		s["B"] = 1
 		time.Sleep(10 * time.Millisecond)
 		return s, nil
 	})
 
-	g.AddNode("C", "C", func(ctx context.Context, state any) (any, error) {
-		s := make(State)
-		maps.Copy(s, state.(State))
+	g.AddNode("C", "C", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		s := make(map[string]any)
+		maps.Copy(s, state)
 		s["C"] = 1
 		time.Sleep(10 * time.Millisecond)
 		return s, nil
@@ -160,12 +168,11 @@ func TestStateGraph_ParallelExecution(t *testing.T) {
 	runnable, err := g.Compile()
 	assert.NoError(t, err)
 
-	initialState := make(State)
+	initialState := make(map[string]any)
 	result, err := runnable.Invoke(context.Background(), initialState)
 	assert.NoError(t, err)
 
-	finalState := result.(State)
-	assert.Equal(t, 1, finalState["A"])
-	assert.Equal(t, 1, finalState["B"])
-	assert.Equal(t, 1, finalState["C"])
+	assert.Equal(t, 1, result["A"])
+	assert.Equal(t, 1, result["B"])
+	assert.Equal(t, 1, result["C"])
 }

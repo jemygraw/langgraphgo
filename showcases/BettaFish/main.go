@@ -37,18 +37,35 @@ func main() {
 
 	query := os.Args[1]
 
-	// Initialize state
-	initialState := schema.NewBettaFishState(query)
+	// Initialize state as map[string]any
+	initialState := map[string]any{
+		"query":      query,
+		"paragraphs": make([]*schema.Paragraph, 0),
+	}
 
-	// Create graph
-	workflow := graph.NewStateGraph()
+	// Create graph using the custom state type
+	workflow := graph.NewStateGraph[map[string]any]()
+
+	// Wrap node functions to match typed signature
+	wrapNode := func(fn func(ctx context.Context, state any) (any, error)) func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		return func(ctx context.Context, s map[string]any) (map[string]any, error) {
+			result, err := fn(ctx, s)
+			if err != nil {
+				return nil, err
+			}
+			if resultMap, ok := result.(map[string]any); ok {
+				return resultMap, nil
+			}
+			return s, nil
+		}
+	}
 
 	// Add nodes
-	workflow.AddNode("query_engine", "Query analysis engine", query_engine.QueryEngineNode)
-	workflow.AddNode("media_engine", "Media search engine", media_engine.MediaEngineNode)
-	workflow.AddNode("insight_engine", "Insight generation engine", insight_engine.InsightEngineNode)
-	workflow.AddNode("forum_engine", "Forum search engine", forum_engine.ForumEngineNode)
-	workflow.AddNode("report_engine", "Report generation engine", report_engine.ReportEngineNode)
+	workflow.AddNode("query_engine", "Query analysis engine", wrapNode(query_engine.QueryEngineNode))
+	workflow.AddNode("media_engine", "Media search engine", wrapNode(media_engine.MediaEngineNode))
+	workflow.AddNode("insight_engine", "Insight generation engine", wrapNode(insight_engine.InsightEngineNode))
+	workflow.AddNode("forum_engine", "Forum search engine", wrapNode(forum_engine.ForumEngineNode))
+	workflow.AddNode("report_engine", "Report generation engine", wrapNode(report_engine.ReportEngineNode))
 
 	// Add edges (Sequential for now)
 	workflow.SetEntryPoint("query_engine")
@@ -66,13 +83,13 @@ func main() {
 
 	// Run graph
 	ctx := context.Background()
-	result, err := app.Invoke(ctx, initialState)
+	finalState, err := app.Invoke(ctx, initialState)
 	if err != nil {
 		log.Fatalf("运行图失败: %v", err)
 	}
 
 	// Print result
-	finalState := result.(*schema.BettaFishState)
+	paragraphs, _ := finalState["paragraphs"].([]*schema.Paragraph)
 	fmt.Println("\n=== 执行完成 ===")
-	fmt.Printf("报告已生成，包含 %d 个段落。\n", len(finalState.Paragraphs))
+	fmt.Printf("报告已生成，包含 %d 个段落。\n", len(paragraphs))
 }

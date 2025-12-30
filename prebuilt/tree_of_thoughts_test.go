@@ -155,8 +155,7 @@ func TestTreeOfThoughtsFindsGoal(t *testing.T) {
 		t.Fatalf("Failed to invoke agent: %v", err)
 	}
 
-	finalState := result.(map[string]any)
-	solution, ok := finalState["solution"].(SearchPath)
+	solution, ok := result["solution"].(SearchPath)
 	if !ok || solution.States == nil {
 		t.Fatal("Expected to find a solution")
 	}
@@ -210,8 +209,7 @@ func TestTreeOfThoughtsPrunesInvalidStates(t *testing.T) {
 		t.Fatalf("Failed to invoke agent: %v", err)
 	}
 
-	finalState := result.(map[string]any)
-	solution := finalState["solution"]
+	solution := result["solution"]
 
 	if solution != nil {
 		t.Error("Expected no solution when only invalid states available")

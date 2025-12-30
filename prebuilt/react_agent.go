@@ -11,7 +11,7 @@ import (
 )
 
 // CreateReactAgent creates a new ReAct agent graph
-func CreateReactAgent(model llms.Model, inputTools []tools.Tool, maxIterations int) (*graph.StateRunnable, error) {
+func CreateReactAgent(model llms.Model, inputTools []tools.Tool, maxIterations int) (*graph.StateRunnable[map[string]any], error) {
 	if maxIterations == 0 {
 		maxIterations = 20
 	}
@@ -19,20 +19,18 @@ func CreateReactAgent(model llms.Model, inputTools []tools.Tool, maxIterations i
 	toolExecutor := NewToolExecutor(inputTools)
 
 	// Define the graph
-	workflow := graph.NewStateGraph()
+	workflow := graph.NewStateGraph[map[string]any]()
 
 	// Define the state schema
 	// We use a MapSchema with AppendReducer for messages
 	agentSchema := graph.NewMapSchema()
 	agentSchema.RegisterReducer("messages", graph.AppendReducer)
-	workflow.SetSchema(agentSchema)
+	schemaAdapter := &graph.MapSchemaAdapter{Schema: agentSchema}
+	workflow.SetSchema(schemaAdapter)
 
 	// Define the agent node
-	workflow.AddNode("agent", "ReAct agent decision maker", func(ctx context.Context, state any) (any, error) {
-		mState, ok := state.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("invalid state type: %T", state)
-		}
+	workflow.AddNode("agent", "ReAct agent decision maker", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		mState := state
 
 		messages, ok := mState["messages"].([]llms.MessageContent)
 		if !ok {
@@ -117,11 +115,8 @@ func CreateReactAgent(model llms.Model, inputTools []tools.Tool, maxIterations i
 	})
 
 	// Define the tools node
-	workflow.AddNode("tools", "Tool execution node", func(ctx context.Context, state any) (any, error) {
-		mState, ok := state.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("invalid state")
-		}
+	workflow.AddNode("tools", "Tool execution node", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		mState := state
 
 		messages := mState["messages"].([]llms.MessageContent)
 		lastMsg := messages[len(messages)-1]
@@ -177,8 +172,8 @@ func CreateReactAgent(model llms.Model, inputTools []tools.Tool, maxIterations i
 	// Define edges
 	workflow.SetEntryPoint("agent")
 
-	workflow.AddConditionalEdge("agent", func(ctx context.Context, state any) string {
-		mState := state.(map[string]any)
+	workflow.AddConditionalEdge("agent", func(ctx context.Context, state map[string]any) string {
+		mState := state
 		messages := mState["messages"].([]llms.MessageContent)
 		lastMsg := messages[len(messages)-1]
 

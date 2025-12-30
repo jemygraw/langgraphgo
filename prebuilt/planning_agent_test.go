@@ -147,8 +147,7 @@ func TestCreatePlanningAgent_SimpleWorkflow(t *testing.T) {
 	assert.NotNil(t, res)
 
 	// Verify Result
-	mState := res.(map[string]any)
-	messages := mState["messages"].([]llms.MessageContent)
+	messages := res["messages"].([]llms.MessageContent)
 
 	// Expected messages:
 	// 0: Human "Please research, analyze, and create a report"
@@ -483,8 +482,7 @@ func TestCreatePlanningAgent_ComplexWorkflow(t *testing.T) {
 	assert.Equal(t, []string{"validate", "process", "save"}, callOrder)
 
 	// Verify messages
-	mState := res.(map[string]any)
-	messages := mState["messages"].([]llms.MessageContent)
+	messages := res["messages"].([]llms.MessageContent)
 	assert.GreaterOrEqual(t, len(messages), 5)
 }
 

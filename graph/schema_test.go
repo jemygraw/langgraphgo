@@ -54,19 +54,19 @@ func TestMapSchema_Update(t *testing.T) {
 }
 
 func TestStateGraph_Schema(t *testing.T) {
-	g := NewStateGraph()
+	g := NewStateGraph[map[string]any]()
 
 	schema := NewMapSchema()
 	schema.RegisterReducer("messages", AppendReducer)
-	g.SetSchema(schema)
+	g.SetSchema(&MapSchemaAdapter{Schema: schema})
 
-	g.AddNode("A", "A", func(ctx context.Context, state any) (any, error) {
+	g.AddNode("A", "A", func(ctx context.Context, state map[string]any) (map[string]any, error) {
 		return map[string]any{
 			"messages": []string{"A"},
 		}, nil
 	})
 
-	g.AddNode("B", "B", func(ctx context.Context, state any) (any, error) {
+	g.AddNode("B", "B", func(ctx context.Context, state map[string]any) (map[string]any, error) {
 		return map[string]any{
 			"messages": []string{"B"},
 		}, nil
@@ -86,6 +86,5 @@ func TestStateGraph_Schema(t *testing.T) {
 	result, err := runnable.Invoke(context.Background(), initialState)
 	assert.NoError(t, err)
 
-	finalState := result.(map[string]any)
-	assert.Equal(t, []string{"start", "A", "B"}, finalState["messages"])
+	assert.Equal(t, []string{"start", "A", "B"}, result["messages"])
 }

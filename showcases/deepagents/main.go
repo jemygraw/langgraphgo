@@ -54,8 +54,8 @@ func main() {
 		log.Fatalf("Agent execution failed: %v", err)
 	}
 
-	// Print result
-	mState := result.(map[string]any)
+	// Print result - result is already map[string]any
+	mState := result
 	messages := mState["messages"].([]llms.MessageContent)
 	lastMsg := messages[len(messages)-1]
 

@@ -10,37 +10,15 @@ import (
 	"github.com/tmc/langchaingo/llms"
 )
 
-// ReflectionAgentConfig configures the reflection agent
-type ReflectionAgentConfig struct {
-	// Model is the LLM to use for both generation and reflection
-	Model llms.Model
-
-	// ReflectionModel is an optional separate model for reflection
-	// If nil, uses the same model as generation
-	ReflectionModel llms.Model
-
-	// MaxIterations is the maximum number of generation-reflection cycles
-	MaxIterations int
-
-	// SystemMessage is the system message for the generation step
-	SystemMessage string
-
-	// ReflectionPrompt is the system message for the reflection step
-	ReflectionPrompt string
-
-	// Verbose enables detailed logging
-	Verbose bool
-}
-
-// CreateReflectionAgent creates a new Reflection Agent that iteratively
-// improves its responses through self-reflection
+// CreateReflectionAgentTyped creates a new Reflection Agent with full type safety.
+// The agent iteratively improves its responses through self-reflection.
 //
 // The Reflection pattern involves:
 // 1. Generate: Create an initial response
 // 2. Reflect: Critique the response and suggest improvements
 // 3. Revise: Generate an improved version based on reflection
 // 4. Repeat until satisfactory or max iterations reached
-func CreateReflectionAgent(config ReflectionAgentConfig) (*graph.StateRunnable[map[string]any], error) {
+func CreateReflectionAgentTyped(config ReflectionAgentConfig) (*graph.StateRunnable[ReflectionAgentState], error) {
 	if config.Model == nil {
 		return nil, fmt.Errorf("model is required")
 	}
@@ -61,67 +39,64 @@ func CreateReflectionAgent(config ReflectionAgentConfig) (*graph.StateRunnable[m
 	}
 
 	if config.ReflectionPrompt == "" {
-		config.ReflectionPrompt = buildDefaultReflectionPrompt()
+		config.ReflectionPrompt = buildDefaultReflectionPromptTyped()
 	}
 
-	// Create the workflow
-	workflow := graph.NewStateGraph[map[string]any]()
+	// Create the workflow with generic state type
+	workflow := graph.NewStateGraph[ReflectionAgentState]()
 
-	// Define state schema
-	agentSchema := graph.NewMapSchema()
-	agentSchema.RegisterReducer("messages", graph.AppendReducer)
-	agentSchema.RegisterReducer("iteration", graph.OverwriteReducer)
-	agentSchema.RegisterReducer("reflection", graph.OverwriteReducer)
-	agentSchema.RegisterReducer("draft", graph.OverwriteReducer)
-	schemaAdapter := &graph.MapSchemaAdapter{Schema: agentSchema}
-	workflow.SetSchema(schemaAdapter)
+	// Define state schema for merging
+	schema := graph.NewStructSchema(
+		ReflectionAgentState{},
+		func(current, new ReflectionAgentState) (ReflectionAgentState, error) {
+			// Append new messages to current messages
+			current.Messages = append(current.Messages, new.Messages...)
+			// Overwrite other fields
+			current.Iteration = new.Iteration
+			current.Reflection = new.Reflection
+			current.Draft = new.Draft
+			return current, nil
+		},
+	)
+	workflow.SetSchema(schema)
 
 	// Add generation node
-	workflow.AddNode("generate", "Generate or revise response based on reflection", func(ctx context.Context, state map[string]any) (map[string]any, error) {
-		return generateNode(ctx, state, config.Model, config.SystemMessage, config.Verbose)
+	workflow.AddNode("generate", "Generate or revise response based on reflection", func(ctx context.Context, state ReflectionAgentState) (ReflectionAgentState, error) {
+		return generateNodeTyped(ctx, state, config.Model, config.SystemMessage, config.Verbose)
 	})
 
 	// Add reflection node
-	workflow.AddNode("reflect", "Reflect on the generated response and suggest improvements", func(ctx context.Context, state map[string]any) (map[string]any, error) {
-		return reflectNode(ctx, state, reflectionModel, config.ReflectionPrompt, config.Verbose)
+	workflow.AddNode("reflect", "Reflect on the generated response and suggest improvements", func(ctx context.Context, state ReflectionAgentState) (ReflectionAgentState, error) {
+		return reflectNodeTyped(ctx, state, reflectionModel, config.ReflectionPrompt, config.Verbose)
 	})
 
 	// Set entry point
 	workflow.SetEntryPoint("generate")
 
 	// Add conditional edge from generate
-	workflow.AddConditionalEdge("generate", func(ctx context.Context, state map[string]any) string {
-		return shouldContinueAfterGenerate(state, config.MaxIterations, config.Verbose)
+	workflow.AddConditionalEdge("generate", func(ctx context.Context, state ReflectionAgentState) string {
+		return shouldContinueAfterGenerateTyped(state, config.MaxIterations, config.Verbose)
 	})
 
 	// Add conditional edge from reflect
-	workflow.AddConditionalEdge("reflect", func(ctx context.Context, state map[string]any) string {
-		return shouldContinueAfterReflect(state, config.Verbose)
+	workflow.AddConditionalEdge("reflect", func(ctx context.Context, state ReflectionAgentState) string {
+		return shouldContinueAfterReflectTyped(state, config.Verbose)
 	})
 
 	return workflow.Compile()
 }
 
-// generateNode generates or revises a response
-func generateNode(ctx context.Context, state map[string]any, model llms.Model, systemMessage string, verbose bool) (map[string]any, error) {
-	mState := state
-
-	// Get current iteration
-	iteration := 0
-	if iter, ok := mState["iteration"].(int); ok {
-		iteration = iter
-	}
-
+// generateNodeTyped generates or revises a response (typed version)
+func generateNodeTyped(ctx context.Context, state ReflectionAgentState, model llms.Model, systemMessage string, verbose bool) (ReflectionAgentState, error) {
 	// Get messages
-	messages, ok := mState["messages"].([]llms.MessageContent)
-	if !ok || len(messages) == 0 {
-		return nil, fmt.Errorf("no messages found in state")
+	if len(state.Messages) == 0 {
+		return state, fmt.Errorf("no messages in state")
 	}
 
 	// Build prompt based on iteration
 	var promptMessages []llms.MessageContent
 
-	if iteration == 0 {
+	if state.Iteration == 0 {
 		// First generation
 		if verbose {
 			log.Info("generating initial response...")
@@ -133,18 +108,15 @@ func generateNode(ctx context.Context, state map[string]any, model llms.Model, s
 				Parts: []llms.ContentPart{llms.TextPart(systemMessage)},
 			},
 		}
-		promptMessages = append(promptMessages, messages...)
+		promptMessages = append(promptMessages, state.Messages...)
 	} else {
 		// Revision based on reflection
-		reflection, ok := mState["reflection"].(string)
-		if !ok || reflection == "" {
-			return nil, fmt.Errorf("no reflection found for revision")
+		if state.Reflection == "" {
+			return state, fmt.Errorf("no reflection found for revision")
 		}
 
-		previousDraft, _ := mState["draft"].(string)
-
 		if verbose {
-			log.Info("revising response (iteration %d)...", iteration)
+			log.Info("revising response (iteration %d)...", state.Iteration)
 		}
 
 		// Construct revision prompt
@@ -160,7 +132,7 @@ Reflection and suggestions for improvement:
 %s
 
 Generate an improved response that addresses the issues raised in the reflection.`,
-			getOriginalRequest(messages), previousDraft, reflection)
+			getOriginalRequestTyped(state.Messages), state.Draft, state.Reflection)
 
 		promptMessages = []llms.MessageContent{
 			{
@@ -177,7 +149,7 @@ Generate an improved response that addresses the issues raised in the reflection
 	// Generate response
 	resp, err := model.GenerateContent(ctx, promptMessages)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate response: %w", err)
+		return state, fmt.Errorf("failed to generate response: %w", err)
 	}
 
 	draft := resp.Choices[0].Content
@@ -192,28 +164,25 @@ Generate an improved response that addresses the issues raised in the reflection
 		Parts: []llms.ContentPart{llms.TextPart(draft)},
 	}
 
-	return map[string]any{
-		"messages":  []llms.MessageContent{aiMsg},
-		"draft":     draft,
-		"iteration": iteration + 1,
+	return ReflectionAgentState{
+		Messages:   []llms.MessageContent{aiMsg},
+		Draft:      draft,
+		Iteration:  state.Iteration + 1,
+		Reflection: state.Reflection,
 	}, nil
 }
 
-// reflectNode reflects on the generated response
-func reflectNode(ctx context.Context, state map[string]any, model llms.Model, reflectionPrompt string, verbose bool) (map[string]any, error) {
-	mState := state
-
-	draft, ok := mState["draft"].(string)
-	if !ok || draft == "" {
-		return nil, fmt.Errorf("no draft found to reflect on")
+// reflectNodeTyped reflects on the generated response (typed version)
+func reflectNodeTyped(ctx context.Context, state ReflectionAgentState, model llms.Model, reflectionPrompt string, verbose bool) (ReflectionAgentState, error) {
+	if state.Draft == "" {
+		return state, fmt.Errorf("no draft found to reflect on")
 	}
 
-	messages, ok := mState["messages"].([]llms.MessageContent)
-	if !ok || len(messages) == 0 {
-		return nil, fmt.Errorf("no messages found in state")
+	if len(state.Messages) == 0 {
+		return state, fmt.Errorf("no messages in state")
 	}
 
-	originalRequest := getOriginalRequest(messages)
+	originalRequest := getOriginalRequestTyped(state.Messages)
 
 	if verbose {
 		log.Info("reflecting on the response...")
@@ -234,7 +203,7 @@ func reflectNode(ctx context.Context, state map[string]any, model llms.Model, re
 Generated response:
 %s
 
-Provide a critical reflection on this response.`, originalRequest, draft)),
+Provide a critical reflection on this response.`, originalRequest, state.Draft)),
 			},
 		},
 	}
@@ -242,7 +211,7 @@ Provide a critical reflection on this response.`, originalRequest, draft)),
 	// Generate reflection
 	resp, err := model.GenerateContent(ctx, reflectionMessages)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate reflection: %w", err)
+		return state, fmt.Errorf("failed to generate reflection: %w", err)
 	}
 
 	reflection := resp.Choices[0].Content
@@ -251,28 +220,23 @@ Provide a critical reflection on this response.`, originalRequest, draft)),
 		log.Info("reflection:\n%s\n", reflection)
 	}
 
-	// Determine if response is satisfactory
-	isSatisfactory := isResponseSatisfactory(reflection)
-
-	return map[string]any{
-		"reflection":      reflection,
-		"is_satisfactory": isSatisfactory,
+	return ReflectionAgentState{
+		Messages:    state.Messages,
+		Iteration:   state.Iteration,
+		Draft:       state.Draft,
+		Reflection:  reflection,
 	}, nil
 }
 
-// shouldContinueAfterGenerate decides whether to reflect or end
-func shouldContinueAfterGenerate(state map[string]any, maxIterations int, verbose bool) string {
-	mState := state
-
-	iteration, _ := mState["iteration"].(int)
-
+// shouldContinueAfterGenerateTyped decides whether to reflect or end (typed version)
+func shouldContinueAfterGenerateTyped(state ReflectionAgentState, maxIterations int, verbose bool) string {
 	// On first iteration, always reflect
-	if iteration == 1 {
+	if state.Iteration == 1 {
 		return "reflect"
 	}
 
 	// If we've reached max iterations, stop
-	if iteration >= maxIterations {
+	if state.Iteration >= maxIterations {
 		if verbose {
 			log.Info("max iterations reached, finalizing response")
 		}
@@ -280,7 +244,7 @@ func shouldContinueAfterGenerate(state map[string]any, maxIterations int, verbos
 	}
 
 	// Check if previous reflection was satisfactory
-	isSatisfactory, _ := mState["is_satisfactory"].(bool)
+	isSatisfactory := isResponseSatisfactoryTyped(state.Reflection)
 	if isSatisfactory {
 		if verbose {
 			log.Info("response is satisfactory, finalizing")
@@ -292,11 +256,9 @@ func shouldContinueAfterGenerate(state map[string]any, maxIterations int, verbos
 	return "reflect"
 }
 
-// shouldContinueAfterReflect decides whether to revise or accept
-func shouldContinueAfterReflect(state map[string]any, verbose bool) string {
-	mState := state
-
-	isSatisfactory, _ := mState["is_satisfactory"].(bool)
+// shouldContinueAfterReflectTyped decides whether to revise or accept (typed version)
+func shouldContinueAfterReflectTyped(state ReflectionAgentState, verbose bool) string {
+	isSatisfactory := isResponseSatisfactoryTyped(state.Reflection)
 
 	if isSatisfactory {
 		if verbose {
@@ -310,7 +272,7 @@ func shouldContinueAfterReflect(state map[string]any, verbose bool) string {
 }
 
 // isResponseSatisfactory analyzes the reflection to determine if response is good
-func isResponseSatisfactory(reflection string) bool {
+func isResponseSatisfactoryTyped(reflection string) bool {
 	reflectionLower := strings.ToLower(reflection)
 
 	// Keywords indicating satisfaction
@@ -385,7 +347,7 @@ func isResponseSatisfactory(reflection string) bool {
 }
 
 // getOriginalRequest extracts the original user request from messages
-func getOriginalRequest(messages []llms.MessageContent) string {
+func getOriginalRequestTyped(messages []llms.MessageContent) string {
 	for _, msg := range messages {
 		if msg.Role == llms.ChatMessageTypeHuman {
 			for _, part := range msg.Parts {
@@ -399,7 +361,7 @@ func getOriginalRequest(messages []llms.MessageContent) string {
 }
 
 // buildDefaultReflectionPrompt creates the default reflection prompt
-func buildDefaultReflectionPrompt() string {
+func buildDefaultReflectionPromptTyped() string {
 	return `You are a critical reviewer providing constructive feedback on AI-generated responses.
 
 Your task is to evaluate the response and provide:

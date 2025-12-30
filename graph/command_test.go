@@ -7,8 +7,22 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// mapSchemaAdapterForAny adapts MapSchema for use with StateGraph[any]
+type mapSchemaAdapterForAny struct {
+	*MapSchema
+}
+
+func (m *mapSchemaAdapterForAny) Init() any {
+	return m.MapSchema.Init()
+}
+
+func (m *mapSchemaAdapterForAny) Update(current, new any) (any, error) {
+	return m.MapSchema.Update(current, new)
+}
+
 func TestCommandGoto(t *testing.T) {
-	g := NewStateGraph()
+	// Use any type to allow returning Command
+	g := NewStateGraph[any]()
 
 	// Define schema
 	schema := NewMapSchema()
@@ -18,7 +32,7 @@ func TestCommandGoto(t *testing.T) {
 		}
 		return curr.(int) + new.(int), nil
 	})
-	g.SetSchema(schema)
+	g.SetSchema(&mapSchemaAdapterForAny{MapSchema: schema})
 
 	// Node A: Returns Command to update count and go to C (skipping B)
 	g.AddNode("A", "A", func(ctx context.Context, state any) (any, error) {

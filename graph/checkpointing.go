@@ -77,6 +77,18 @@ func (cr *CheckpointableRunnable) Invoke(ctx context.Context, initialState any) 
 
 // InvokeWithConfig executes the graph with checkpointing and config
 func (cr *CheckpointableRunnable) InvokeWithConfig(ctx context.Context, initialState any, config *Config) (any, error) {
+	// Convert initialState to map[string]any
+	var stateMap map[string]any
+	if initialState != nil {
+		if m, ok := initialState.(map[string]any); ok {
+			stateMap = m
+		} else {
+			return nil, fmt.Errorf("initialState must be map[string]any, got %T", initialState)
+		}
+	} else {
+		stateMap = make(map[string]any)
+	}
+
 	// Extract thread_id from config if present
 	var threadID string
 	if config != nil && config.Configurable != nil {
@@ -99,7 +111,7 @@ func (cr *CheckpointableRunnable) InvokeWithConfig(ctx context.Context, initialS
 	}
 	config.Callbacks = append(config.Callbacks, checkpointListener)
 
-	return cr.runnable.InvokeWithConfig(ctx, initialState, config)
+	return cr.runnable.InvokeWithConfig(ctx, stateMap, config)
 }
 
 // SaveCheckpoint manually saves a checkpoint
@@ -207,25 +219,25 @@ func (cl *CheckpointListener) OnGraphStep(ctx context.Context, stepNode string, 
 // or we can remove it if we don't use it as NodeListener anymore.
 // CheckpointableRunnable currently adds it as NodeListener. We should change that.
 
-// CheckpointableStateGraph extends ListenableStateGraph with checkpointing
+// CheckpointableStateGraph extends ListenableStateGraphUntyped with checkpointing
 type CheckpointableStateGraph struct {
-	*ListenableStateGraph
+	*ListenableStateGraphUntyped
 	config CheckpointConfig
 }
 
 // NewCheckpointableStateGraph creates a new checkpointable state graph
 func NewCheckpointableStateGraph() *CheckpointableStateGraph {
 	return &CheckpointableStateGraph{
-		ListenableStateGraph: NewListenableStateGraph(),
-		config:               DefaultCheckpointConfig(),
+		ListenableStateGraphUntyped: NewListenableStateGraphUntyped(),
+		config:                     DefaultCheckpointConfig(),
 	}
 }
 
 // NewCheckpointableStateGraphWithConfig creates a checkpointable graph with custom config
 func NewCheckpointableStateGraphWithConfig(config CheckpointConfig) *CheckpointableStateGraph {
 	return &CheckpointableStateGraph{
-		ListenableStateGraph: NewListenableStateGraph(),
-		config:               config,
+		ListenableStateGraphUntyped: NewListenableStateGraphUntyped(),
+		config:                     config,
 	}
 }
 
@@ -371,14 +383,30 @@ func (cr *CheckpointableRunnable) UpdateState(ctx context.Context, config *Confi
 	newState := values
 	if cr.runnable.graph.Schema != nil {
 		// If Schema is defined, use it to update state with results
-		var baseState any
+		var baseState map[string]any
 		if currentState != nil {
-			baseState = currentState
+			if bs, ok := currentState.(map[string]any); ok {
+				baseState = bs
+			} else {
+				baseState = make(map[string]any)
+			}
 		} else {
-			baseState = cr.runnable.graph.Schema.Init()
+			// Schema.Init() returns map[string]any for StateSchemaTyped[map[string]any]
+			init := cr.runnable.graph.Schema.Init()
+			baseState = init
+			if baseState == nil {
+				baseState = make(map[string]any)
+			}
 		}
 
-		if merged, err := cr.runnable.graph.Schema.Update(baseState, values); err != nil {
+		var valuesMap map[string]any
+		if vm, ok := values.(map[string]any); ok {
+			valuesMap = vm
+		} else {
+			valuesMap = make(map[string]any)
+		}
+
+		if merged, err := cr.runnable.graph.Schema.Update(baseState, valuesMap); err != nil {
 			return nil, fmt.Errorf("failed to merge state: %w", err)
 		} else {
 			newState = merged
@@ -421,4 +449,410 @@ func (cr *CheckpointableRunnable) UpdateState(ctx context.Context, config *Confi
 			"checkpoint_id": checkpoint.ID,
 		},
 	}, nil
+}
+
+// Generic checkpointing types
+
+// CheckpointableStateGraphTyped[S any] extends ListenableStateGraphTyped[S] with checkpointing
+type CheckpointableStateGraphTyped[S any] struct {
+	*ListenableStateGraphTyped[S]
+	config CheckpointConfig
+}
+
+// NewCheckpointableStateGraphTyped creates a new checkpointable state graph with type parameter
+func NewCheckpointableStateGraphTyped[S any]() *CheckpointableStateGraphTyped[S] {
+	baseGraph := NewListenableStateGraphTyped[S]()
+	return &CheckpointableStateGraphTyped[S]{
+		ListenableStateGraphTyped: baseGraph,
+		config:                    DefaultCheckpointConfig(),
+	}
+}
+
+// NewCheckpointableStateGraphTypedWithConfig creates a checkpointable graph with custom config
+func NewCheckpointableStateGraphTypedWithConfig[S any](config CheckpointConfig) *CheckpointableStateGraphTyped[S] {
+	baseGraph := NewListenableStateGraphTyped[S]()
+	return &CheckpointableStateGraphTyped[S]{
+		ListenableStateGraphTyped: baseGraph,
+		config:                    config,
+	}
+}
+
+// CompileCheckpointable compiles the graph into a checkpointable runnable
+func (g *CheckpointableStateGraphTyped[S]) CompileCheckpointable() (*CheckpointableRunnableTyped[S], error) {
+	listenableRunnable, err := g.CompileListenable()
+	if err != nil {
+		return nil, err
+	}
+
+	return NewCheckpointableRunnableTyped(listenableRunnable, g.config), nil
+}
+
+// SetCheckpointConfig updates the checkpointing configuration
+func (g *CheckpointableStateGraphTyped[S]) SetCheckpointConfig(config CheckpointConfig) {
+	g.config = config
+}
+
+// GetCheckpointConfig returns the current checkpointing configuration
+func (g *CheckpointableStateGraphTyped[S]) GetCheckpointConfig() CheckpointConfig {
+	return g.config
+}
+
+// CheckpointableRunnableTyped[S] wraps a ListenableRunnableTyped[S] with checkpointing capabilities
+type CheckpointableRunnableTyped[S any] struct {
+	runnable    *ListenableRunnableTyped[S]
+	config      CheckpointConfig
+	executionID string
+	listener    *CheckpointListener
+}
+
+// NewCheckpointableRunnableTyped creates a new checkpointable runnable from a listenable runnable
+func NewCheckpointableRunnableTyped[S any](runnable *ListenableRunnableTyped[S], config CheckpointConfig) *CheckpointableRunnableTyped[S] {
+	executionID := generateExecutionID()
+	cr := &CheckpointableRunnableTyped[S]{
+		runnable:    runnable,
+		config:      config,
+		executionID: executionID,
+	}
+
+	// Create checkpoint listener (the listener uses untyped state 'any')
+	cr.listener = &CheckpointListener{
+		store:       cr.config.Store,
+		executionID: executionID,
+		threadID:    "",
+		autoSave:    true,
+	}
+
+	// Note: We don't add the listener via AddGlobalListener because
+	// CheckpointListener is untyped (uses NodeListener interface, not NodeListenerTyped[S])
+	// Instead, checkpointing is handled via callbacks in InvokeWithConfig
+
+	return cr
+}
+
+// Invoke executes the graph with checkpointing support
+func (cr *CheckpointableRunnableTyped[S]) Invoke(ctx context.Context, initialState S) (S, error) {
+	return cr.InvokeWithConfig(ctx, initialState, nil)
+}
+
+// InvokeWithConfig executes the graph with checkpointing support and config
+func (cr *CheckpointableRunnableTyped[S]) InvokeWithConfig(ctx context.Context, initialState S, config *Config) (S, error) {
+	// Extract thread_id from config if present
+	var threadID string
+	if config != nil && config.Configurable != nil {
+		if tid, ok := config.Configurable["thread_id"].(string); ok {
+			threadID = tid
+		}
+	}
+
+	// Update checkpoint listener with thread_id
+	if cr.listener != nil {
+		cr.listener.threadID = threadID
+		cr.listener.autoSave = cr.config.AutoSave
+	}
+
+	// Add checkpoint listener to config callbacks
+	if config == nil {
+		config = &Config{}
+	}
+	config.Callbacks = append(config.Callbacks, cr.listener)
+
+	return cr.runnable.InvokeWithConfig(ctx, initialState, config)
+}
+
+// Stream executes the graph with checkpointing and streaming support
+func (cr *CheckpointableRunnableTyped[S]) Stream(ctx context.Context, initialState S) <-chan StreamEventTyped[S] {
+	return cr.runnable.Stream(ctx, initialState)
+}
+
+// GetState retrieves the state for the given config
+func (cr *CheckpointableRunnableTyped[S]) GetState(ctx context.Context, config *Config) (*StateSnapshot, error) {
+	var threadID string
+	var checkpointID string
+
+	if config != nil && config.Configurable != nil {
+		if tid, ok := config.Configurable["thread_id"].(string); ok {
+			threadID = tid
+		}
+		if cid, ok := config.Configurable["checkpoint_id"].(string); ok {
+			checkpointID = cid
+		}
+	}
+
+	// Default to current execution ID if thread_id not provided
+	if threadID == "" {
+		threadID = cr.executionID
+	}
+
+	var checkpoint *Checkpoint
+	var err error
+
+	if checkpointID != "" {
+		checkpoint, err = cr.config.Store.Load(ctx, checkpointID)
+	} else {
+		// Get latest checkpoint for the thread
+		checkpoints, err := cr.config.Store.List(ctx, threadID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list checkpoints: %w", err)
+		}
+
+		if len(checkpoints) == 0 {
+			return nil, fmt.Errorf("no checkpoints found for thread %s", threadID)
+		}
+
+		// Get the latest checkpoint (highest version)
+		checkpoint = checkpoints[0]
+		for _, cp := range checkpoints {
+			if cp.Version > checkpoint.Version {
+				checkpoint = cp
+			}
+		}
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to load checkpoint: %w", err)
+	}
+
+	if checkpoint == nil {
+		return nil, fmt.Errorf("checkpoint not found")
+	}
+
+	// Return state snapshot
+	next := []string{checkpoint.NodeName}
+	if checkpoint.NodeName == "" {
+		next = []string{}
+	}
+	return &StateSnapshot{
+		Values:   checkpoint.State,
+		Next:     next,
+		Config: Config{
+			Configurable: map[string]any{
+				"thread_id":     threadID,
+				"checkpoint_id": checkpoint.ID,
+			},
+		},
+		Metadata:  checkpoint.Metadata,
+		CreatedAt: checkpoint.Timestamp,
+	}, nil
+}
+
+// SaveCheckpoint manually saves a checkpoint at the current state
+func (cr *CheckpointableRunnableTyped[S]) SaveCheckpoint(ctx context.Context, nodeName string, state S) error {
+	// Get current version to increment
+	checkpoints, _ := cr.config.Store.List(ctx, cr.executionID)
+	version := 1
+	if len(checkpoints) > 0 {
+		for _, cp := range checkpoints {
+			if cp.Version >= version {
+				version = cp.Version + 1
+			}
+		}
+	}
+
+	checkpoint := &Checkpoint{
+		ID:        generateCheckpointID(),
+		NodeName:  nodeName,
+		State:     state,
+		Timestamp: time.Now(),
+		Version:   version,
+		Metadata: map[string]any{
+			"execution_id": cr.executionID,
+			"source":       "manual_save",
+			"saved_by":     nodeName,
+		},
+	}
+
+	return cr.config.Store.Save(ctx, checkpoint)
+}
+
+// ListCheckpoints lists all checkpoints for the current execution
+func (cr *CheckpointableRunnableTyped[S]) ListCheckpoints(ctx context.Context) ([]*Checkpoint, error) {
+	return cr.config.Store.List(ctx, cr.executionID)
+}
+
+// UpdateState updates the state and saves a checkpoint.
+// For typed graphs, this method is less commonly used. Consider using UpdateStateTyped instead.
+func (cr *CheckpointableRunnableTyped[S]) UpdateState(ctx context.Context, config *Config, asNode string, values map[string]any) (*Config, error) {
+	var threadID string
+
+	if config != nil && config.Configurable != nil {
+		if tid, ok := config.Configurable["thread_id"].(string); ok {
+			threadID = tid
+		}
+	}
+
+	if threadID == "" {
+		threadID = cr.executionID
+	}
+
+	// Get current state from config if available
+	var currentState S
+	var currentVersion int
+
+	if config != nil {
+		snapshot, err := cr.GetState(ctx, config)
+		if err == nil && snapshot != nil {
+			currentState = snapshot.Values.(S)
+			// Find current version
+			checkpoints, _ := cr.config.Store.List(ctx, threadID)
+			for _, cp := range checkpoints {
+				if cp.Version > currentVersion {
+					currentVersion = cp.Version
+				}
+			}
+		}
+	}
+
+	// For typed graphs, we can't directly use map[string]any with Schema.Update
+	// because typed schemas expect two S values.
+	// So we'll just save the values directly as a new state.
+	// Users should use UpdateStateTyped for proper typed updates.
+
+	var newState S
+	// If currentState is map[string]any, try to merge
+	if currentMap, ok := any(currentState).(map[string]any); ok {
+		merged := make(map[string]any)
+		maps.Copy(merged, currentMap)
+		maps.Copy(merged, values)
+		newState = any(merged).(S)
+	} else {
+		// For non-map types, we can't do a proper merge without more type information
+		// Just save the values as-is (this is a limitation)
+		newState = currentState
+	}
+
+	// Get max version
+	checkpoints, _ := cr.config.Store.List(ctx, threadID)
+	version := 1
+	for _, cp := range checkpoints {
+		if cp.Version >= version {
+			version = cp.Version + 1
+		}
+	}
+
+	// Create new checkpoint
+	checkpoint := &Checkpoint{
+		ID:        generateCheckpointID(),
+		NodeName:  asNode,
+		State:     newState,
+		Timestamp: time.Now(),
+		Version:   version,
+		Metadata: map[string]any{
+			"execution_id": threadID,
+			"source":       "update_state",
+			"updated_by":   asNode,
+		},
+	}
+
+	if err := cr.config.Store.Save(ctx, checkpoint); err != nil {
+		return nil, err
+	}
+
+	return &Config{
+		Configurable: map[string]any{
+			"thread_id":     threadID,
+			"checkpoint_id": checkpoint.ID,
+		},
+	}, nil
+}
+
+// UpdateStateTyped updates the state with proper type safety and saves a checkpoint.
+// This is the preferred method for typed graphs.
+func (cr *CheckpointableRunnableTyped[S]) UpdateStateTyped(ctx context.Context, config *Config, asNode string, updateFunc func(S) S) (*Config, error) {
+	var threadID string
+
+	if config != nil && config.Configurable != nil {
+		if tid, ok := config.Configurable["thread_id"].(string); ok {
+			threadID = tid
+		}
+	}
+
+	if threadID == "" {
+		threadID = cr.executionID
+	}
+
+	// Get current state from config if available
+	var currentState S
+
+	if config != nil {
+		snapshot, err := cr.GetState(ctx, config)
+		if err == nil && snapshot != nil {
+			currentState = snapshot.Values.(S)
+		}
+	}
+
+	// Apply update function
+	newState := updateFunc(currentState)
+
+	// Get max version
+	checkpoints, _ := cr.config.Store.List(ctx, threadID)
+	version := 1
+	for _, cp := range checkpoints {
+		if cp.Version >= version {
+			version = cp.Version + 1
+		}
+	}
+
+	// Create new checkpoint
+	checkpoint := &Checkpoint{
+		ID:        generateCheckpointID(),
+		NodeName:  asNode,
+		State:     newState,
+		Timestamp: time.Now(),
+		Version:   version,
+		Metadata: map[string]any{
+			"execution_id": threadID,
+			"source":       "update_state_typed",
+			"updated_by":   asNode,
+		},
+	}
+
+	if err := cr.config.Store.Save(ctx, checkpoint); err != nil {
+		return nil, err
+	}
+
+	return &Config{
+		Configurable: map[string]any{
+			"thread_id":     threadID,
+			"checkpoint_id": checkpoint.ID,
+		},
+	}, nil
+}
+
+// GetExecutionID returns the current execution ID
+func (cr *CheckpointableRunnableTyped[S]) GetExecutionID() string {
+	return cr.executionID
+}
+
+// SetExecutionID sets a new execution ID
+func (cr *CheckpointableRunnableTyped[S]) SetExecutionID(executionID string) {
+	cr.executionID = executionID
+	if cr.listener != nil {
+		cr.listener.executionID = executionID
+	}
+}
+
+// GetTracer returns the tracer from the underlying runnable
+func (cr *CheckpointableRunnableTyped[S]) GetTracer() *Tracer {
+	return cr.runnable.GetTracer()
+}
+
+// SetTracer sets the tracer on the underlying runnable
+func (cr *CheckpointableRunnableTyped[S]) SetTracer(tracer *Tracer) {
+	cr.runnable.SetTracer(tracer)
+}
+
+// WithTracer returns a new CheckpointableRunnableTyped with the given tracer
+func (cr *CheckpointableRunnableTyped[S]) WithTracer(tracer *Tracer) *CheckpointableRunnableTyped[S] {
+	newRunnable := cr.runnable.WithTracer(tracer)
+	return &CheckpointableRunnableTyped[S]{
+		runnable:    newRunnable,
+		config:      cr.config,
+		executionID: cr.executionID,
+		listener:    cr.listener,
+	}
+}
+
+// GetGraph returns the underlying graph
+func (cr *CheckpointableRunnableTyped[S]) GetGraph() *ListenableStateGraphTyped[S] {
+	return cr.runnable.GetListenableGraph()
 }

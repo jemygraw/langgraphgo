@@ -91,7 +91,7 @@ func main() {
 	runAgent(agent, query3)
 }
 
-func runAgent(agent *graph.StateRunnable, query string) {
+func runAgent(agent *graph.StateRunnableUntyped query string) {
 	fmt.Printf("\nUser Query: %s\n\n", query)
 
 	initialState := map[string]any{

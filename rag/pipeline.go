@@ -3,7 +3,6 @@ package rag
 import (
 	"context"
 	"fmt"
-	"maps"
 	"strings"
 	"time"
 
@@ -64,7 +63,7 @@ func DefaultPipelineConfig() *PipelineConfig {
 // RAGPipeline represents a complete RAG pipeline
 type RAGPipeline struct {
 	config *PipelineConfig
-	graph  *graph.StateGraph
+	graph  *graph.StateGraph[map[string]any]
 }
 
 // NewRAGPipeline creates a new RAG pipeline with the given configuration
@@ -73,7 +72,7 @@ func NewRAGPipeline(config *PipelineConfig) *RAGPipeline {
 		config = DefaultPipelineConfig()
 	}
 
-	g := graph.NewStateGraph()
+	g := graph.NewStateGraph[map[string]any]()
 	g.SetSchema(&ragStateSchema{})
 
 	return &RAGPipeline{
@@ -84,52 +83,28 @@ func NewRAGPipeline(config *PipelineConfig) *RAGPipeline {
 
 type ragStateSchema struct{}
 
-func (s *ragStateSchema) Init() any {
-	return RAGState{
-		Metadata: make(map[string]any),
+func (s *ragStateSchema) Init() map[string]any {
+	return map[string]any{
+		"query": "",
+		"context": "",
+		"answer": "",
+		"documents": []Document{},
+		"retrieved_documents": []Document{},
+		"ranked_documents": []Document{},
+		"citations": []string{},
+		"metadata": make(map[string]any),
 	}
 }
 
-func (s *ragStateSchema) Update(current, new any) (any, error) {
-	currState, ok := current.(RAGState)
-	if !ok {
-		return new, nil
+func (s *ragStateSchema) Update(current, new map[string]any) (map[string]any, error) {
+	result := make(map[string]any)
+	for k, v := range current {
+		result[k] = v
 	}
-	newState, ok := new.(RAGState)
-	if !ok {
-		return current, nil
+	for k, v := range new {
+		result[k] = v
 	}
-
-	// Simple overwrite for now, but ensure we don't lose data
-	if newState.Query != "" {
-		currState.Query = newState.Query
-	}
-	if newState.Context != "" {
-		currState.Context = newState.Context
-	}
-	if newState.Answer != "" {
-		currState.Answer = newState.Answer
-	}
-	if len(newState.Documents) > 0 {
-		currState.Documents = newState.Documents
-	}
-	if len(newState.RetrievedDocuments) > 0 {
-		currState.RetrievedDocuments = newState.RetrievedDocuments
-	}
-	if len(newState.RankedDocuments) > 0 {
-		currState.RankedDocuments = newState.RankedDocuments
-	}
-	if len(newState.Citations) > 0 {
-		currState.Citations = newState.Citations
-	}
-	if newState.Metadata != nil {
-		if currState.Metadata == nil {
-			currState.Metadata = make(map[string]any)
-		}
-		maps.Copy(currState.Metadata, newState.Metadata)
-	}
-
-	return currState, nil
+	return result, nil
 }
 
 // BuildBasicRAG builds a basic RAG pipeline: Retrieve -> Generate
@@ -233,9 +208,9 @@ func (p *RAGPipeline) BuildConditionalRAG() error {
 	p.graph.AddEdge("retrieve", "rerank")
 
 	// Conditional edge based on relevance score
-	p.graph.AddConditionalEdge("rerank", func(ctx context.Context, state any) string {
-		ragState := state.(RAGState)
-		if len(ragState.RankedDocuments) > 0 && ragState.RankedDocuments[0].Score >= p.config.ScoreThreshold {
+	p.graph.AddConditionalEdge("rerank", func(ctx context.Context, state map[string]any) string {
+		rankedDocs, _ := state["ranked_documents"].([]DocumentSearchResult)
+		if len(rankedDocs) > 0 && rankedDocs[0].Score >= p.config.ScoreThreshold {
 			return "generate"
 		}
 		if p.config.UseFallback {
@@ -259,102 +234,101 @@ func (p *RAGPipeline) BuildConditionalRAG() error {
 }
 
 // Compile compiles the RAG pipeline into a runnable graph
-func (p *RAGPipeline) Compile() (*graph.StateRunnable, error) {
+func (p *RAGPipeline) Compile() (*graph.StateRunnable[map[string]any], error) {
 	return p.graph.Compile()
 }
 
 // GetGraph returns the underlying graph for visualization
-func (p *RAGPipeline) GetGraph() *graph.StateGraph {
+func (p *RAGPipeline) GetGraph() *graph.StateGraph[map[string]any] {
 	return p.graph
 }
 
 // Node implementations
 
-func (p *RAGPipeline) retrieveNode(ctx context.Context, state any) (any, error) {
-	ragState := state.(RAGState)
+func (p *RAGPipeline) retrieveNode(ctx context.Context, state map[string]any) (map[string]any, error) {
+	query, _ := state["query"].(string)
 
-	docs, err := p.config.Retriever.Retrieve(ctx, ragState.Query)
+	docs, err := p.config.Retriever.Retrieve(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("retrieval failed: %w", err)
 	}
 
-	ragState.RetrievedDocuments = convertToRAGDocuments(docs)
-	ragState.Documents = convertToRAGDocuments(docs)
+	state["retrieved_documents"] = convertToRAGDocuments(docs)
+	state["documents"] = convertToRAGDocuments(docs)
 
-	return ragState, nil
+	return state, nil
 }
 
-func (p *RAGPipeline) rerankNode(ctx context.Context, state any) (any, error) {
-	ragState := state.(RAGState)
+func (p *RAGPipeline) rerankNode(ctx context.Context, state map[string]any) (map[string]any, error) {
+	query, _ := state["query"].(string)
+	retrievedDocs, _ := state["retrieved_documents"].([]RAGDocument)
 
 	if p.config.Reranker == nil {
 		// If no reranker, just assign scores based on order
-		rankedDocs := make([]DocumentSearchResult, len(ragState.RetrievedDocuments))
-		for i, doc := range ragState.RetrievedDocuments {
+		rankedDocs := make([]DocumentSearchResult, len(retrievedDocs))
+		for i, doc := range retrievedDocs {
 			rankedDocs[i] = DocumentSearchResult{
 				Document: doc.Document(),
 				Score:    1.0 - float64(i)*0.1, // Simple decreasing score
 			}
 		}
-		ragState.RankedDocuments = rankedDocs
-		return ragState, nil
+		state["ranked_documents"] = rankedDocs
+		return state, nil
 	}
 
 	// Convert to DocumentSearchResult for reranking
-	searchResults := make([]DocumentSearchResult, len(ragState.RetrievedDocuments))
-	for i, doc := range ragState.RetrievedDocuments {
+	searchResults := make([]DocumentSearchResult, len(retrievedDocs))
+	for i, doc := range retrievedDocs {
 		searchResults[i] = DocumentSearchResult{
 			Document: doc.Document(),
 			Score:    1.0 - float64(i)*0.1,
 		}
 	}
 
-	rerankedResults, err := p.config.Reranker.Rerank(ctx, ragState.Query, searchResults)
+	rerankedResults, err := p.config.Reranker.Rerank(ctx, query, searchResults)
 	if err != nil {
 		return nil, fmt.Errorf("reranking failed: %w", err)
 	}
 
-	ragState.RankedDocuments = rerankedResults
+	state["ranked_documents"] = rerankedResults
 
 	// Update documents with reranked order
 	docs := make([]RAGDocument, len(rerankedResults))
 	for i, rd := range rerankedResults {
 		docs[i] = DocumentFromRAGDocument(rd.Document)
 	}
-	ragState.Documents = docs
+	state["documents"] = docs
 
-	return ragState, nil
+	return state, nil
 }
 
-func (p *RAGPipeline) fallbackSearchNode(ctx context.Context, state any) (any, error) {
-	ragState := state.(RAGState)
-
+func (p *RAGPipeline) fallbackSearchNode(ctx context.Context, state map[string]any) (map[string]any, error) {
 	// Placeholder for fallback search (e.g., web search)
 	// In a real implementation, this would call an external search API
-	ragState.Metadata = map[string]any{
+	state["metadata"] = map[string]any{
 		"fallback_used": true,
 	}
 
-	return ragState, nil
+	return state, nil
 }
 
-func (p *RAGPipeline) generateNode(ctx context.Context, state any) (any, error) {
-	ragState := state.(RAGState)
-	// fmt.Printf("DEBUG generateNode: state.Documents len = %d\n", len(ragState.Documents))
+func (p *RAGPipeline) generateNode(ctx context.Context, state map[string]any) (map[string]any, error) {
+	query, _ := state["query"].(string)
+	documents, _ := state["documents"].([]RAGDocument)
 
 	// Build context from retrieved documents
 	var contextParts []string
-	for i, doc := range ragState.Documents {
+	for i, doc := range documents {
 		source := "Unknown"
 		if s, ok := doc.Metadata["source"]; ok {
 			source = fmt.Sprintf("%v", s)
 		}
 		contextParts = append(contextParts, fmt.Sprintf("[%d] Source: %s\nContent: %s", i+1, source, doc.Content))
 	}
-	ragState.Context = strings.Join(contextParts, "\n\n")
+	contextStr := strings.Join(contextParts, "\n\n")
 
 	// Build prompt
-	prompt := fmt.Sprintf("Context:\n%s\n\nQuestion: %s\n\nAnswer:", ragState.Context, ragState.Query)
+	prompt := fmt.Sprintf("Context:\n%s\n\nQuestion: %s\n\nAnswer:", contextStr, query)
 
 	messages := []llms.MessageContent{
 		llms.TextParts("system", p.config.SystemPrompt),
@@ -368,27 +342,28 @@ func (p *RAGPipeline) generateNode(ctx context.Context, state any) (any, error) 
 	}
 
 	if len(response.Choices) > 0 {
-		ragState.Answer = response.Choices[0].Content
+		state["answer"] = response.Choices[0].Content
 	}
+	state["context"] = contextStr
 
-	return ragState, nil
+	return state, nil
 }
 
-func (p *RAGPipeline) formatCitationsNode(ctx context.Context, state any) (any, error) {
-	ragState := state.(RAGState)
+func (p *RAGPipeline) formatCitationsNode(ctx context.Context, state map[string]any) (map[string]any, error) {
+	documents, _ := state["documents"].([]RAGDocument)
 
 	// Extract citations from documents
-	citations := make([]string, len(ragState.Documents))
-	for i, doc := range ragState.Documents {
+	citations := make([]string, len(documents))
+	for i, doc := range documents {
 		source := "Unknown"
 		if s, ok := doc.Metadata["source"]; ok {
 			source = fmt.Sprintf("%v", s)
 		}
 		citations[i] = fmt.Sprintf("[%d] %s", i+1, source)
 	}
-	ragState.Citations = citations
+	state["citations"] = citations
 
-	return ragState, nil
+	return state, nil
 }
 
 // RAGDocument represents a document with content and metadata (for pipeline compatibility)

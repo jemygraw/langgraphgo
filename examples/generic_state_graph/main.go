@@ -47,7 +47,7 @@ func example1_SimpleGraph() {
 	fmt.Println("-----------------------------------")
 
 	// Create a generic graph with WorkflowState type
-	g := graph.NewStateGraphTyped[WorkflowState]()
+	g := graph.NewStateGraph[WorkflowState]()
 
 	// Add nodes with full type safety - no type assertions needed!
 	g.AddNode("check_age", "Check if user is adult", func(ctx context.Context, state WorkflowState) (WorkflowState, error) {
@@ -114,7 +114,7 @@ func example2_ConditionalRouting() {
 	fmt.Println("Example 2: Conditional Routing")
 	fmt.Println("-------------------------------")
 
-	g := graph.NewStateGraphTyped[WorkflowState]()
+	g := graph.NewStateGraph[WorkflowState]()
 
 	g.AddNode("check_age", "Check age", func(ctx context.Context, state WorkflowState) (WorkflowState, error) {
 		fmt.Printf("Checking age for %s (%d years old)\n", state.Request.Name, state.Request.Age)
@@ -174,7 +174,7 @@ func example3_WithSchema() {
 		Processing bool
 	}
 
-	g := graph.NewStateGraphTyped[ProcessState]()
+	g := graph.NewStateGraph[ProcessState]()
 
 	// Create a schema with custom merge logic
 	schema := graph.NewStructSchema(

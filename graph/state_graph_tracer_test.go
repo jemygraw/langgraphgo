@@ -7,15 +7,15 @@ import (
 
 func TestStateGraph_WithTracer(t *testing.T) {
 	// Create a StateGraph
-	g := NewStateGraph()
+	g := NewStateGraph[map[string]any]()
 
 	// Add nodes
-	g.AddNode("node1", "First node", func(ctx context.Context, state any) (any, error) {
-		return "result1", nil
+	g.AddNode("node1", "First node", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		return map[string]any{"result": "result1"}, nil
 	})
 
-	g.AddNode("node2", "Second node", func(ctx context.Context, state any) (any, error) {
-		return "result2", nil
+	g.AddNode("node2", "Second node", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		return map[string]any{"result": "result2"}, nil
 	})
 
 	g.AddEdge("node1", "node2")
@@ -43,7 +43,7 @@ func TestStateGraph_WithTracer(t *testing.T) {
 	}
 
 	// Execute the graph with tracer
-	_, err = runnableWithTracer.Invoke(context.Background(), "initial")
+	_, err = runnableWithTracer.Invoke(context.Background(), map[string]any{"initial": true})
 	if err != nil {
 		t.Fatalf("Failed to invoke: %v", err)
 	}

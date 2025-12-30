@@ -57,7 +57,7 @@ func (p *ProgressTracker) OnNodeEvent(ctx context.Context, event graph.NodeEvent
 
 func main() {
 	// Create a typed listenable state graph
-	workflow := graph.NewListenableStateGraphTyped[CounterState]()
+	workflow := graph.NewListenableStateGraph[CounterState]()
 
 	// Add global listeners
 	logger := &EventLogger{}

@@ -84,7 +84,7 @@ func main() {
 	// Manually implemented to fix "did not select next step" error and add debug info
 	g := graph.NewStateGraph()
 
-	agentNode := func(agent *graph.StateRunnable) func(context.Context, any) (any, error) {
+	agentNode := func(agent *graph.StateRunnableUntyped func(context.Context, any) (any, error) {
 		return func(ctx context.Context, state any) (any, error) {
 			return agent.Invoke(ctx, state)
 		}

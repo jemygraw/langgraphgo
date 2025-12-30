@@ -14,9 +14,15 @@ func TestNewMessageGraph(t *testing.T) {
 	}
 
 	// Verify messages reducer is registered
-	mapSchema, ok := g.Schema.(*MapSchema)
+	// Schema is wrapped in MapSchemaAdapter for map[string]any
+	mapAdapter, ok := g.Schema.(*MapSchemaAdapter)
 	if !ok {
-		t.Fatal("Schema should be a MapSchema")
+		t.Fatal("Schema should be a MapSchemaAdapter")
+	}
+
+	mapSchema := mapAdapter.Schema
+	if mapSchema == nil {
+		t.Fatal("MapSchema should not be nil")
 	}
 
 	if mapSchema.Reducers == nil {
@@ -28,7 +34,7 @@ func TestNewMessageGraph(t *testing.T) {
 	}
 
 	// Test that the schema works with AddMessages
-	g.AddNode("node1", "Test node", func(ctx context.Context, state any) (any, error) {
+	g.AddNode("node1", "Test node", func(ctx context.Context, state map[string]any) (map[string]any, error) {
 		return map[string]any{
 			"messages": []map[string]any{
 				{"role": "assistant", "content": "Hello"},
@@ -57,12 +63,7 @@ func TestNewMessageGraph(t *testing.T) {
 	}
 
 	// Verify messages were merged
-	resultMap, ok := result.(map[string]any)
-	if !ok {
-		t.Fatal("Result should be a map")
-	}
-
-	messages, ok := resultMap["messages"].([]map[string]any)
+	messages, ok := result["messages"].([]map[string]any)
 	if !ok {
 		t.Fatal("messages should be a slice")
 	}

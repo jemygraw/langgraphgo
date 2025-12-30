@@ -19,7 +19,7 @@ func TestRetryNode(t *testing.T) {
 	t.Parallel()
 
 	t.Run("SuccessOnFirstAttempt", func(t *testing.T) {
-		g := graph.NewStateGraph()
+		g := graph.NewStateGraphUntyped()
 		callCount := int32(0)
 
 		g.AddNodeWithRetry("retry_node", "retry_node", func(ctx context.Context, state any) (any, error) {
@@ -41,12 +41,12 @@ func TestRetryNode(t *testing.T) {
 			t.Fatalf("Failed to compile: %v", err)
 		}
 
-		result, err := runnable.Invoke(context.Background(), "input")
+		result, err := runnable.Invoke(context.Background(), map[string]any{"input": "input"})
 		if err != nil {
 			t.Fatalf("Execution failed: %v", err)
 		}
 
-		if result != successResult {
+		actualResult, ok := result["value"]; if !ok || actualResult != successResult {
 			t.Errorf("Expected success, got %v", result)
 		}
 
@@ -56,7 +56,7 @@ func TestRetryNode(t *testing.T) {
 	})
 
 	t.Run("RetryOnTransientFailure", func(t *testing.T) {
-		g := graph.NewStateGraph()
+		g := graph.NewStateGraphUntyped()
 		callCount := int32(0)
 
 		g.AddNodeWithRetry("retry_node", "retry_node", func(ctx context.Context, state any) (any, error) {
@@ -81,12 +81,12 @@ func TestRetryNode(t *testing.T) {
 			t.Fatalf("Failed to compile: %v", err)
 		}
 
-		result, err := runnable.Invoke(context.Background(), "input")
+		result, err := runnable.Invoke(context.Background(), map[string]any{"input": "input"})
 		if err != nil {
 			t.Fatalf("Execution failed: %v", err)
 		}
 
-		if result != successResult {
+		actualResult, ok := result["value"]; if !ok || actualResult != successResult {
 			t.Errorf("Expected success, got %v", result)
 		}
 
@@ -96,7 +96,7 @@ func TestRetryNode(t *testing.T) {
 	})
 
 	t.Run("MaxAttemptsExceeded", func(t *testing.T) {
-		g := graph.NewStateGraph()
+		g := graph.NewStateGraphUntyped()
 		callCount := int32(0)
 
 		g.AddNodeWithRetry("retry_node", "retry_node", func(ctx context.Context, state any) (any, error) {
@@ -118,7 +118,7 @@ func TestRetryNode(t *testing.T) {
 			t.Fatalf("Failed to compile: %v", err)
 		}
 
-		_, err = runnable.Invoke(context.Background(), "input")
+		_, err = runnable.Invoke(context.Background(), map[string]any{"input": "input"})
 		if err == nil {
 			t.Error("Expected error for max retries exceeded")
 		}
@@ -129,7 +129,7 @@ func TestRetryNode(t *testing.T) {
 	})
 
 	t.Run("NonRetryableError", func(t *testing.T) {
-		g := graph.NewStateGraph()
+		g := graph.NewStateGraphUntyped()
 		callCount := int32(0)
 
 		g.AddNodeWithRetry("retry_node", "retry_node", func(ctx context.Context, state any) (any, error) {
@@ -155,7 +155,7 @@ func TestRetryNode(t *testing.T) {
 			t.Fatalf("Failed to compile: %v", err)
 		}
 
-		_, err = runnable.Invoke(context.Background(), "input")
+		_, err = runnable.Invoke(context.Background(), map[string]any{"input": "input"})
 		if err == nil {
 			t.Error("Expected error for non-retryable error")
 		}
@@ -171,7 +171,7 @@ func TestTimeoutNode(t *testing.T) {
 	t.Parallel()
 
 	t.Run("SuccessWithinTimeout", func(t *testing.T) {
-		g := graph.NewStateGraph()
+		g := graph.NewStateGraphUntyped()
 
 		g.AddNodeWithTimeout("timeout_node", "timeout_node", func(ctx context.Context, state any) (any, error) {
 			time.Sleep(10 * time.Millisecond)
@@ -188,18 +188,18 @@ func TestTimeoutNode(t *testing.T) {
 			t.Fatalf("Failed to compile: %v", err)
 		}
 
-		result, err := runnable.Invoke(context.Background(), "input")
+		result, err := runnable.Invoke(context.Background(), map[string]any{"input": "input"})
 		if err != nil {
 			t.Fatalf("Execution failed: %v", err)
 		}
 
-		if result != successResult {
+		actualResult, ok := result["value"]; if !ok || actualResult != successResult {
 			t.Errorf("Expected success, got %v", result)
 		}
 	})
 
 	t.Run("TimeoutExceeded", func(t *testing.T) {
-		g := graph.NewStateGraph()
+		g := graph.NewStateGraphUntyped()
 
 		g.AddNodeWithTimeout("timeout_node", "timeout_node", func(ctx context.Context, state any) (any, error) {
 			time.Sleep(100 * time.Millisecond)
@@ -216,14 +216,14 @@ func TestTimeoutNode(t *testing.T) {
 			t.Fatalf("Failed to compile: %v", err)
 		}
 
-		_, err = runnable.Invoke(context.Background(), "input")
+		_, err = runnable.Invoke(context.Background(), map[string]any{"input": "input"})
 		if err == nil {
 			t.Error("Expected timeout error")
 		}
 	})
 
 	t.Run("RespectContextCancellation", func(t *testing.T) {
-		g := graph.NewStateGraph()
+		g := graph.NewStateGraphUntyped()
 
 		g.AddNodeWithTimeout("timeout_node", "timeout_node", func(ctx context.Context, _ any) (any, error) {
 			select {
@@ -247,7 +247,7 @@ func TestTimeoutNode(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
 		defer cancel()
 
-		_, err = runnable.Invoke(ctx, "input")
+		_, err = runnable.Invoke(ctx, map[string]any{"input": "input"})
 		if err == nil {
 			t.Error("Expected context cancellation error")
 		}
@@ -258,7 +258,7 @@ func TestCircuitBreaker(t *testing.T) {
 	t.Parallel()
 
 	t.Run("CircuitOpensAfterFailures", func(t *testing.T) {
-		g := graph.NewStateGraph()
+		g := graph.NewStateGraphUntyped()
 		callCount := int32(0)
 
 		g.AddNodeWithCircuitBreaker("cb_node", "cb_node", func(ctx context.Context, state any) (any, error) {
@@ -282,13 +282,13 @@ func TestCircuitBreaker(t *testing.T) {
 		}
 
 		// First call - should fail
-		_, _ = runnable.Invoke(context.Background(), "input")
+		_, _ = runnable.Invoke(context.Background(), map[string]any{"input": "input"})
 
 		// Second call - should fail and open circuit
-		_, _ = runnable.Invoke(context.Background(), "input")
+		_, _ = runnable.Invoke(context.Background(), map[string]any{"input": "input"})
 
 		// Third call - circuit should be open
-		_, err = runnable.Invoke(context.Background(), "input")
+		_, err = runnable.Invoke(context.Background(), map[string]any{"input": "input"})
 		if err == nil {
 			t.Error("Expected circuit breaker open error")
 		}
@@ -300,7 +300,7 @@ func TestCircuitBreaker(t *testing.T) {
 	})
 
 	t.Run("CircuitClosesAfterSuccess", func(t *testing.T) {
-		g := graph.NewStateGraph()
+		g := graph.NewStateGraphUntyped()
 		callCount := int32(0)
 
 		g.AddNodeWithCircuitBreaker("cb_node", "cb_node", func(ctx context.Context, state any) (any, error) {
@@ -328,19 +328,19 @@ func TestCircuitBreaker(t *testing.T) {
 		}
 
 		// First two calls fail and open circuit
-		_, _ = runnable.Invoke(context.Background(), "input")
-		_, _ = runnable.Invoke(context.Background(), "input")
+		_, _ = runnable.Invoke(context.Background(), map[string]any{"input": "input"})
+		_, _ = runnable.Invoke(context.Background(), map[string]any{"input": "input"})
 
 		// Wait for timeout to move to half-open
 		time.Sleep(15 * time.Millisecond)
 
 		// This call should succeed and close circuit
-		result, err := runnable.Invoke(context.Background(), "input")
+		result, err := runnable.Invoke(context.Background(), map[string]any{"input": "input"})
 		if err != nil {
 			t.Fatalf("Expected success after circuit recovery: %v", err)
 		}
 
-		if result != successResult {
+		actualResult, ok := result["value"]; if !ok || actualResult != successResult {
 			t.Errorf("Expected success, got %v", result)
 		}
 	})
@@ -351,7 +351,7 @@ func TestRateLimiter(t *testing.T) {
 	t.Parallel()
 
 	t.Run("AllowsCallsWithinLimit", func(t *testing.T) {
-		g := graph.NewStateGraph()
+		g := graph.NewStateGraphUntyped()
 		callCount := int32(0)
 
 		g.AddNodeWithRateLimit("rate_limited", "rate_limited", func(ctx context.Context, state any) (any, error) {
@@ -372,11 +372,11 @@ func TestRateLimiter(t *testing.T) {
 
 		// Make 3 calls within the window - all should succeed
 		for i := range 3 {
-			result, err := runnable.Invoke(context.Background(), "input")
+			result, err := runnable.Invoke(context.Background(), map[string]any{"input": "input"})
 			if err != nil {
 				t.Fatalf("Call %d failed: %v", i+1, err)
 			}
-			if result != successResult {
+			actualResult, ok := result["value"]; if !ok || actualResult != successResult {
 				t.Errorf("Expected success, got %v", result)
 			}
 		}
@@ -387,7 +387,7 @@ func TestRateLimiter(t *testing.T) {
 	})
 
 	t.Run("BlocksCallsExceedingLimit", func(t *testing.T) {
-		g := graph.NewStateGraph()
+		g := graph.NewStateGraphUntyped()
 		callCount := int32(0)
 
 		g.AddNodeWithRateLimit("rate_limited", "rate_limited", func(ctx context.Context, state any) (any, error) {
@@ -407,11 +407,11 @@ func TestRateLimiter(t *testing.T) {
 		}
 
 		// Make 2 calls - should succeed
-		_, _ = runnable.Invoke(context.Background(), "input")
-		_, _ = runnable.Invoke(context.Background(), "input")
+		_, _ = runnable.Invoke(context.Background(), map[string]any{"input": "input"})
+		_, _ = runnable.Invoke(context.Background(), map[string]any{"input": "input"})
 
 		// Third call should be rate limited
-		_, err = runnable.Invoke(context.Background(), "input")
+		_, err = runnable.Invoke(context.Background(), map[string]any{"input": "input"})
 		if err == nil {
 			t.Error("Expected rate limit error")
 		}
@@ -422,7 +422,7 @@ func TestRateLimiter(t *testing.T) {
 	})
 
 	t.Run("AllowsCallsAfterWindowExpires", func(t *testing.T) {
-		g := graph.NewStateGraph()
+		g := graph.NewStateGraphUntyped()
 		callCount := int32(0)
 
 		g.AddNodeWithRateLimit("rate_limited", "rate_limited", func(ctx context.Context, state any) (any, error) {
@@ -442,19 +442,19 @@ func TestRateLimiter(t *testing.T) {
 		}
 
 		// Make 2 calls
-		_, _ = runnable.Invoke(context.Background(), "input")
-		_, _ = runnable.Invoke(context.Background(), "input")
+		_, _ = runnable.Invoke(context.Background(), map[string]any{"input": "input"})
+		_, _ = runnable.Invoke(context.Background(), map[string]any{"input": "input"})
 
 		// Wait for window to expire
 		time.Sleep(60 * time.Millisecond)
 
 		// Should be able to make more calls
-		result, err := runnable.Invoke(context.Background(), "input")
+		result, err := runnable.Invoke(context.Background(), map[string]any{"input": "input"})
 		if err != nil {
 			t.Fatalf("Call after window expiry failed: %v", err)
 		}
 
-		if result != successResult {
+		actualResult, ok := result["value"]; if !ok || actualResult != successResult {
 			t.Errorf("Expected success, got %v", result)
 		}
 
@@ -489,6 +489,7 @@ func TestExponentialBackoffRetry(t *testing.T) {
 			t.Fatalf("Expected success, got error: %v", err)
 		}
 
+		// ExponentialBackoffRetry returns result directly, not wrapped
 		if result != successResult {
 			t.Errorf("Expected success, got %v", result)
 		}

@@ -9,50 +9,17 @@ import (
 	"github.com/smallnest/langgraphgo/graph"
 	"github.com/smallnest/langgraphgo/log"
 	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/tools"
 )
 
-// PEVAgentConfig configures the PEV (Plan, Execute, Verify) agent
-type PEVAgentConfig struct {
-	// Model is the LLM to use for planning and verification
-	Model llms.Model
-
-	// Tools are the available tools that can be executed
-	Tools []tools.Tool
-
-	// MaxRetries is the maximum number of retry attempts when verification fails
-	MaxRetries int
-
-	// SystemMessage is the system message for the planner
-	SystemMessage string
-
-	// VerificationPrompt is the prompt for the verifier
-	VerificationPrompt string
-
-	// Verbose enables detailed logging
-	Verbose bool
-}
-
-// VerificationResult represents the result of verification
-type VerificationResult struct {
-	IsSuccessful bool   `json:"is_successful"`
-	Reasoning    string `json:"reasoning"`
-}
-
-// CreatePEVAgent creates a new PEV (Plan, Execute, Verify) Agent that implements
-// a robust, self-correcting loop for reliable task execution.
+// CreatePEVAgentTyped creates a new PEV (Plan, Execute, Verify) Agent with full type safety.
+// The agent implements a robust, self-correcting loop for reliable task execution.
 //
 // The PEV pattern involves:
 // 1. Plan: Break down the user request into executable steps
 // 2. Execute: Run each step using available tools
 // 3. Verify: Check if the execution was successful
 // 4. Retry: If verification fails, re-plan and execute again
-//
-// This pattern is particularly useful for:
-// - High-stakes automation scenarios
-// - Systems requiring accuracy verification
-// - Situations with unreliable external tools
-func CreatePEVAgent(config PEVAgentConfig) (*graph.StateRunnable[map[string]any], error) {
+func CreatePEVAgentTyped(config PEVAgentConfig) (*graph.StateRunnable[PEVAgentState], error) {
 	if config.Model == nil {
 		return nil, fmt.Errorf("model is required")
 	}
@@ -63,67 +30,72 @@ func CreatePEVAgent(config PEVAgentConfig) (*graph.StateRunnable[map[string]any]
 
 	// Default system messages
 	if config.SystemMessage == "" {
-		config.SystemMessage = buildDefaultPlannerPrompt()
+		config.SystemMessage = buildDefaultPlannerPromptTyped()
 	}
 
 	if config.VerificationPrompt == "" {
-		config.VerificationPrompt = buildDefaultVerificationPrompt()
+		config.VerificationPrompt = buildDefaultVerificationPromptTyped()
 	}
 
 	// Create tool executor
 	toolExecutor := NewToolExecutor(config.Tools)
 
-	// Create the workflow
-	workflow := graph.NewStateGraph[map[string]any]()
+	// Create the workflow with generic state type
+	workflow := graph.NewStateGraph[PEVAgentState]()
 
-	// Define state schema
-	agentSchema := graph.NewMapSchema()
-	agentSchema.RegisterReducer("messages", graph.AppendReducer)
-	agentSchema.RegisterReducer("plan", graph.OverwriteReducer)
-	agentSchema.RegisterReducer("current_step", graph.OverwriteReducer)
-	agentSchema.RegisterReducer("last_tool_result", graph.OverwriteReducer)
-	agentSchema.RegisterReducer("intermediate_steps", graph.AppendReducer)
-	agentSchema.RegisterReducer("retries", graph.OverwriteReducer)
-	agentSchema.RegisterReducer("verification_result", graph.OverwriteReducer)
-	agentSchema.RegisterReducer("final_answer", graph.OverwriteReducer)
-	// Wrap in adapter to match StateSchemaTyped[map[string]any]
-	schemaAdapter := &graph.MapSchemaAdapter{Schema: agentSchema}
-	workflow.SetSchema(schemaAdapter)
+	// Define state schema for merging
+	schema := graph.NewStructSchema(
+		PEVAgentState{},
+		func(current, new PEVAgentState) (PEVAgentState, error) {
+			// Append messages and intermediate steps
+			current.Messages = append(current.Messages, new.Messages...)
+			current.IntermediateSteps = append(current.IntermediateSteps, new.IntermediateSteps...)
+			// Overwrite other fields
+			current.Plan = new.Plan
+			current.CurrentStep = new.CurrentStep
+			current.LastToolResult = new.LastToolResult
+			current.Retries = new.Retries
+			current.VerificationResult = new.VerificationResult
+			current.FinalAnswer = new.FinalAnswer
+			return current, nil
+		},
+	)
+	workflow.SetSchema(schema)
 
 	// Add planner node
-	workflow.AddNode("planner", "Create or revise execution plan", func(ctx context.Context, state map[string]any) (map[string]any, error) {
-		return plannerNode(ctx, state, config.Model, config.SystemMessage, config.Verbose)
+	workflow.AddNode("planner", "Create or revise execution plan", func(ctx context.Context, state PEVAgentState) (PEVAgentState, error) {
+		return plannerNodeTyped(ctx, state, config.Model, config.SystemMessage, config.Verbose)
 	})
 
 	// Add executor node
-	workflow.AddNode("executor", "Execute the current step using tools", func(ctx context.Context, state map[string]any) (map[string]any, error) {
-		return executorNode(ctx, state, toolExecutor, config.Model, config.Verbose)
+	workflow.AddNode("executor", "Execute the current step using tools", func(ctx context.Context, state PEVAgentState) (PEVAgentState, error) {
+		return executorNodeTyped(ctx, state, toolExecutor, config.Model, config.Verbose)
 	})
 
 	// Add verifier node
-	workflow.AddNode("verifier", "Verify the execution result", func(ctx context.Context, state map[string]any) (map[string]any, error) {
-		return verifierNode(ctx, state, config.Model, config.VerificationPrompt, config.Verbose)
+	workflow.AddNode("verifier", "Verify the execution result", func(ctx context.Context, state PEVAgentState) (PEVAgentState, error) {
+		return verifierNodeTyped(ctx, state, config.Model, config.VerificationPrompt, config.Verbose)
 	})
 
 	// Add synthesizer node
-	workflow.AddNode("synthesizer", "Synthesize final answer from all steps", func(ctx context.Context, state map[string]any) (map[string]any, error) {
-		return synthesizerNode(ctx, state, config.Model, config.Verbose)
+	workflow.AddNode("synthesizer", "Synthesize final answer from all steps", func(ctx context.Context, state PEVAgentState) (PEVAgentState, error) {
+		return synthesizerNodeTyped(ctx, state, config.Model, config.Verbose)
 	})
 
 	// Set entry point
 	workflow.SetEntryPoint("planner")
 
 	// Add conditional edges
-	workflow.AddConditionalEdge("planner", func(ctx context.Context, state map[string]any) string {
-		return routeAfterPlanner(state, config.Verbose)
+	workflow.AddConditionalEdge("planner", func(ctx context.Context, state PEVAgentState) string {
+		return routeAfterPlannerTyped(state, config.Verbose)
 	})
 
-	workflow.AddConditionalEdge("executor", func(ctx context.Context, state map[string]any) string {
-		return routeAfterExecutor(state, config.Verbose)
+	workflow.AddConditionalEdge("executor", func(ctx context.Context, state PEVAgentState) string {
+		return routeAfterExecutorTyped(state, config.Verbose)
 	})
 
-	workflow.AddConditionalEdge("verifier", func(ctx context.Context, state map[string]any) string {
-		return routeAfterVerifier(state, config.MaxRetries, config.Verbose)
+	workflow.AddConditionalEdge("verifier", func(ctx context.Context, state PEVAgentState) string {
+		return routeAfterVerifierTyped(state, config.MaxRetries, config.Verbose)
 	})
 
 	workflow.AddEdge("synthesizer", graph.END)
@@ -131,28 +103,24 @@ func CreatePEVAgent(config PEVAgentConfig) (*graph.StateRunnable[map[string]any]
 	return workflow.Compile()
 }
 
-// plannerNode creates or revises an execution plan
-func plannerNode(ctx context.Context, state map[string]any, model llms.Model, systemMessage string, verbose bool) (map[string]any, error) {
-	mState := state
-
-	retries, _ := mState["retries"].(int)
-	messages, ok := mState["messages"].([]llms.MessageContent)
-	if !ok || len(messages) == 0 {
-		return nil, fmt.Errorf("no messages found in state")
+// plannerNodeTyped creates or revises an execution plan (typed version)
+func plannerNodeTyped(ctx context.Context, state PEVAgentState, model llms.Model, systemMessage string, verbose bool) (PEVAgentState, error) {
+	if len(state.Messages) == 0 {
+		return state, fmt.Errorf("no messages in state")
 	}
 
 	if verbose {
-		if retries == 0 {
+		if state.Retries == 0 {
 			log.Info("planning execution steps...")
 		} else {
-			log.Info("re-planning (attempt %d)...", retries+1)
+			log.Info("re-planning (attempt %d)...", state.Retries+1)
 		}
 	}
 
 	// Build planning prompt
 	var promptMessages []llms.MessageContent
 
-	if retries == 0 {
+	if state.Retries == 0 {
 		// Initial planning
 		promptMessages = []llms.MessageContent{
 			{
@@ -160,12 +128,9 @@ func plannerNode(ctx context.Context, state map[string]any, model llms.Model, sy
 				Parts: []llms.ContentPart{llms.TextPart(systemMessage)},
 			},
 		}
-		promptMessages = append(promptMessages, messages...)
+		promptMessages = append(promptMessages, state.Messages...)
 	} else {
 		// Re-planning after verification failure
-		lastResult, _ := mState["last_tool_result"].(string)
-		verificationResult, _ := mState["verification_result"].(VerificationResult)
-
 		replanPrompt := fmt.Sprintf(`The previous execution failed verification. Please create a revised plan.
 
 Original request:
@@ -178,7 +143,7 @@ Verification feedback:
 %s
 
 Create a new plan that addresses the issues identified.`,
-			getOriginalRequest(messages), lastResult, verificationResult.Reasoning)
+			getOriginalRequest(state.Messages), state.LastToolResult, state.VerificationResult)
 
 		promptMessages = []llms.MessageContent{
 			{
@@ -195,13 +160,13 @@ Create a new plan that addresses the issues identified.`,
 	// Generate plan
 	resp, err := model.GenerateContent(ctx, promptMessages)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate plan: %w", err)
+		return state, fmt.Errorf("failed to generate plan: %w", err)
 	}
 
 	planText := resp.Choices[0].Content
 
 	// Parse plan into steps
-	steps := parsePlanSteps(planText)
+	steps := parsePlanStepsTyped(planText)
 
 	if verbose {
 		log.Info("plan created with %d steps", len(steps))
@@ -211,60 +176,53 @@ Create a new plan that addresses the issues identified.`,
 		log.Info("")
 	}
 
-	return map[string]any{
-		"plan":         steps,
-		"current_step": 0,
+	return PEVAgentState{
+		Messages:     state.Messages,
+		Plan:         steps,
+		CurrentStep:  0,
+		Retries:      state.Retries,
 	}, nil
 }
 
-// executorNode executes the current step
-func executorNode(ctx context.Context, state map[string]any, toolExecutor *ToolExecutor, model llms.Model, verbose bool) (map[string]any, error) {
-	mState := state
-
-	plan, ok := mState["plan"].([]string)
-	if !ok || len(plan) == 0 {
-		return nil, fmt.Errorf("no plan found in state")
+// executorNodeTyped executes the current step (typed version)
+func executorNodeTyped(ctx context.Context, state PEVAgentState, toolExecutor *ToolExecutor, model llms.Model, verbose bool) (PEVAgentState, error) {
+	if len(state.Plan) == 0 {
+		return state, fmt.Errorf("no plan found in state")
 	}
 
-	currentStep, _ := mState["current_step"].(int)
-	if currentStep >= len(plan) {
-		return nil, fmt.Errorf("current step index out of bounds")
+	if state.CurrentStep >= len(state.Plan) {
+		return state, fmt.Errorf("current step index out of bounds")
 	}
 
-	stepDescription := plan[currentStep]
+	stepDescription := state.Plan[state.CurrentStep]
 
 	if verbose {
-		log.Info("executing step %d/%d: %s", currentStep+1, len(plan), stepDescription)
+		log.Info("executing step %d/%d: %s", state.CurrentStep+1, len(state.Plan), stepDescription)
 	}
 
 	// Use LLM to decide which tool to call
-	result, err := executeStep(ctx, stepDescription, toolExecutor, model)
+	result, err := executeStepPEVTyped(ctx, stepDescription, toolExecutor, model)
 	if err != nil {
 		result = fmt.Sprintf("Error: %v", err)
 	}
 
 	if verbose {
-		log.Info("result: %s\n", truncateString(result, 200))
+		log.Info("result: %s\n", truncateStringTyped(result, 200))
 	}
 
-	return map[string]any{
-		"last_tool_result":   result,
-		"intermediate_steps": []string{fmt.Sprintf("Step %d: %s -> %s", currentStep+1, stepDescription, truncateString(result, 100))},
+	return PEVAgentState{
+		Messages:          state.Messages,
+		Plan:              state.Plan,
+		CurrentStep:       state.CurrentStep,
+		LastToolResult:    result,
+		IntermediateSteps: []string{fmt.Sprintf("Step %d: %s -> %s", state.CurrentStep+1, stepDescription, truncateStringTyped(result, 100))},
+		Retries:           state.Retries,
 	}, nil
 }
 
-// verifierNode verifies the execution result
-func verifierNode(ctx context.Context, state map[string]any, model llms.Model, verificationPrompt string, verbose bool) (map[string]any, error) {
-	mState := state // Already map[string]any
-
-	lastResult, ok := mState["last_tool_result"].(string)
-	if !ok {
-		return nil, fmt.Errorf("no tool result found to verify")
-	}
-
-	plan, _ := mState["plan"].([]string)
-	currentStep, _ := mState["current_step"].(int)
-	stepDescription := plan[currentStep]
+// verifierNodeTyped verifies the execution result (typed version)
+func verifierNodeTyped(ctx context.Context, state PEVAgentState, model llms.Model, verificationPrompt string, verbose bool) (PEVAgentState, error) {
+	stepDescription := state.Plan[state.CurrentStep]
 
 	if verbose {
 		log.Info("verifying execution result...")
@@ -284,7 +242,7 @@ Determine if this result indicates success or failure. Respond with JSON in this
   "is_successful": true or false,
   "reasoning": "your explanation here"
 }`,
-		stepDescription, lastResult)
+		stepDescription, state.LastToolResult)
 
 	promptMessages := []llms.MessageContent{
 		{
@@ -300,14 +258,14 @@ Determine if this result indicates success or failure. Respond with JSON in this
 	// Generate verification
 	resp, err := model.GenerateContent(ctx, promptMessages)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate verification: %w", err)
+		return state, fmt.Errorf("failed to generate verification: %w", err)
 	}
 
 	verificationText := resp.Choices[0].Content
 
 	// Parse verification result
 	var verificationResult VerificationResult
-	if err := parseVerificationResult(verificationText, &verificationResult); err != nil {
+	if err := parseVerificationResultTyped(verificationText, &verificationResult); err != nil {
 		// If parsing fails, assume failure for safety
 		verificationResult = VerificationResult{
 			IsSuccessful: false,
@@ -323,26 +281,27 @@ Determine if this result indicates success or failure. Respond with JSON in this
 		}
 	}
 
-	return map[string]any{
-		"verification_result": verificationResult,
+	return PEVAgentState{
+		Messages:           state.Messages,
+		Plan:               state.Plan,
+		CurrentStep:        state.CurrentStep,
+		LastToolResult:     state.LastToolResult,
+		IntermediateSteps:  state.IntermediateSteps,
+		Retries:            state.Retries,
+		VerificationResult: verificationResult.Reasoning,
 	}, nil
 }
 
-// synthesizerNode creates the final answer from all intermediate steps
-func synthesizerNode(ctx context.Context, state map[string]any, model llms.Model, verbose bool) (map[string]any, error) {
-	mState := state // Already map[string]any
-
-	messages, _ := mState["messages"].([]llms.MessageContent)
-	intermediateSteps, _ := mState["intermediate_steps"].([]string)
-
+// synthesizerNodeTyped creates the final answer from all intermediate steps (typed version)
+func synthesizerNodeTyped(ctx context.Context, state PEVAgentState, model llms.Model, verbose bool) (PEVAgentState, error) {
 	if verbose {
 		log.Info("synthesizing final answer...")
 	}
 
-	originalRequest := getOriginalRequest(messages)
+	originalRequest := getOriginalRequest(state.Messages)
 
 	// Build synthesis prompt
-	stepsText := strings.Join(intermediateSteps, "\n")
+	stepsText := strings.Join(state.IntermediateSteps, "\n")
 	synthesisPrompt := fmt.Sprintf(`Based on the following execution steps, provide a final answer to the user's request.
 
 User request:
@@ -368,7 +327,7 @@ Provide a clear, concise final answer that directly addresses the user's request
 	// Generate final answer
 	resp, err := model.GenerateContent(ctx, promptMessages)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate final answer: %w", err)
+		return state, fmt.Errorf("failed to generate final answer: %w", err)
 	}
 
 	finalAnswer := resp.Choices[0].Content
@@ -383,19 +342,22 @@ Provide a clear, concise final answer that directly addresses the user's request
 		Parts: []llms.ContentPart{llms.TextPart(finalAnswer)},
 	}
 
-	return map[string]any{
-		"messages":     []llms.MessageContent{aiMsg},
-		"final_answer": finalAnswer,
+	return PEVAgentState{
+		Messages:           []llms.MessageContent{aiMsg},
+		Plan:               state.Plan,
+		CurrentStep:        state.CurrentStep,
+		LastToolResult:     state.LastToolResult,
+		IntermediateSteps:  state.IntermediateSteps,
+		Retries:            state.Retries,
+		VerificationResult: state.VerificationResult,
+		FinalAnswer:        finalAnswer,
 	}, nil
 }
 
-// Routing functions
+// Routing functions (typed versions)
 
-func routeAfterPlanner(state map[string]any, verbose bool) string {
-	mState := state
-	plan, ok := mState["plan"].([]string)
-
-	if !ok || len(plan) == 0 {
+func routeAfterPlannerTyped(state PEVAgentState, verbose bool) string {
+	if len(state.Plan) == 0 {
 		if verbose {
 			log.Warn("no plan created, ending")
 		}
@@ -405,24 +367,20 @@ func routeAfterPlanner(state map[string]any, verbose bool) string {
 	return "executor"
 }
 
-func routeAfterExecutor(state map[string]any, verbose bool) string {
+func routeAfterExecutorTyped(state PEVAgentState, verbose bool) string {
 	// After execution, always verify
 	return "verifier"
 }
 
-func routeAfterVerifier(state map[string]any, maxRetries int, verbose bool) string {
-	mState := state
+func routeAfterVerifierTyped(state PEVAgentState, maxRetries int, verbose bool) string {
+	isSuccessful := strings.Contains(strings.ToLower(state.VerificationResult), "success") ||
+		!strings.Contains(strings.ToLower(state.VerificationResult), "fail")
 
-	verificationResult, _ := mState["verification_result"].(VerificationResult)
-	currentStep, _ := mState["current_step"].(int)
-	plan, _ := mState["plan"].([]string)
-	retries, _ := mState["retries"].(int)
+	nextStep := state.CurrentStep + 1
 
-	if verificationResult.IsSuccessful {
+	if isSuccessful {
 		// Move to next step
-		nextStep := currentStep + 1
-
-		if nextStep >= len(plan) {
+		if nextStep >= len(state.Plan) {
 			// All steps completed successfully
 			if verbose {
 				log.Info("all steps completed successfully, synthesizing final answer")
@@ -430,13 +388,12 @@ func routeAfterVerifier(state map[string]any, maxRetries int, verbose bool) stri
 			return "synthesizer"
 		}
 
-		// Continue to next step
-		mState["current_step"] = nextStep
+		// Continue to next step (need to update state in place)
 		return "executor"
 	}
 
 	// Verification failed
-	if retries >= maxRetries {
+	if state.Retries >= maxRetries {
 		if verbose {
 			log.Error("max retries (%d) reached, synthesizing with partial results\n", maxRetries)
 		}
@@ -444,14 +401,12 @@ func routeAfterVerifier(state map[string]any, maxRetries int, verbose bool) stri
 	}
 
 	// Retry with re-planning
-	mState["retries"] = retries + 1
-	mState["plan"] = nil // Clear plan to force re-planning
 	return "planner"
 }
 
-// Helper functions
+// Helper functions (typed versions)
 
-func parsePlanSteps(planText string) []string {
+func parsePlanStepsTyped(planText string) []string {
 	lines := strings.Split(planText, "\n")
 	var steps []string
 
@@ -481,7 +436,7 @@ func parsePlanSteps(planText string) []string {
 	return steps
 }
 
-func executeStep(ctx context.Context, stepDescription string, toolExecutor *ToolExecutor, model llms.Model) (string, error) {
+func executeStepPEVTyped(ctx context.Context, stepDescription string, toolExecutor *ToolExecutor, model llms.Model) (string, error) {
 	if toolExecutor == nil || len(toolExecutor.tools) == 0 {
 		return fmt.Sprintf("Error: No tools available to execute %s", stepDescription), nil
 	}
@@ -528,7 +483,7 @@ Return ONLY a JSON object with the following format:
 
 	// 4. Parse response
 	var invocation ToolInvocation
-	if err := parseToolChoice(choiceText, &invocation); err != nil {
+	if err := parseToolChoiceTyped(choiceText, &invocation); err != nil {
 		return "", fmt.Errorf("failed to parse tool choice: %w (Response: %s)", err, choiceText)
 	}
 
@@ -536,7 +491,7 @@ Return ONLY a JSON object with the following format:
 	return toolExecutor.Execute(ctx, invocation)
 }
 
-func parseToolChoice(text string, invocation *ToolInvocation) error {
+func parseToolChoiceTyped(text string, invocation *ToolInvocation) error {
 	// Try to find JSON in the text
 	text = strings.TrimSpace(text)
 
@@ -557,7 +512,7 @@ func parseToolChoice(text string, invocation *ToolInvocation) error {
 	return nil
 }
 
-func parseVerificationResult(text string, result *VerificationResult) error {
+func parseVerificationResultTyped(text string, result *VerificationResult) error {
 	// Try to find JSON in the text
 	text = strings.TrimSpace(text)
 
@@ -578,14 +533,14 @@ func parseVerificationResult(text string, result *VerificationResult) error {
 	return nil
 }
 
-func truncateString(s string, maxLen int) string {
+func truncateStringTyped(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
 	}
 	return s[:maxLen] + "..."
 }
 
-func buildDefaultPlannerPrompt() string {
+func buildDefaultPlannerPromptTyped() string {
 	return `You are an expert planner that breaks down user requests into concrete, executable steps.
 
 Your task is to:
@@ -603,7 +558,7 @@ Format your plan as a numbered list:
 Be concise but specific. Each step should be something that can be executed using available tools.`
 }
 
-func buildDefaultVerificationPrompt() string {
+func buildDefaultVerificationPromptTyped() string {
 	return `You are a verification specialist that checks if executions were successful.
 
 Your task is to:

@@ -38,15 +38,14 @@ func TestToolNode(t *testing.T) {
 	res, err := toolNode.Invoke(context.Background(), state)
 	assert.NoError(t, err)
 
-	// Verify result
-	resMap, ok := res.(map[string]any)
+	// Verify result - ToolNode returns any, so we need type assertion
+	mState, ok := res.(map[string]any)
 	assert.True(t, ok)
-
-	messages, ok := resMap["messages"].([]llms.MessageContent)
+	msgs, ok := mState["messages"].([]llms.MessageContent)
 	assert.True(t, ok)
-	assert.Len(t, messages, 1)
+	assert.Len(t, msgs, 1)
 
-	toolMsg := messages[0]
+	toolMsg := msgs[0]
 	assert.Equal(t, llms.ChatMessageTypeTool, toolMsg.Role)
 	assert.Len(t, toolMsg.Parts, 1)
 

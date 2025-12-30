@@ -68,33 +68,33 @@ func TestRAGPipelineNodes(t *testing.T) {
 	p := NewRAGPipeline(config)
 
 	t.Run("Retrieve Node", func(t *testing.T) {
-		state := RAGState{Query: "test"}
+		state := map[string]any{"query": "test", "documents": []Document{}}
 		res, err := p.retrieveNode(ctx, state)
 		assert.NoError(t, err)
-		s := res.(RAGState)
-		assert.Len(t, s.Documents, 1)
+		docs, _ := res["documents"].([]RAGDocument)
+		assert.Len(t, docs, 1)
 	})
 
 	t.Run("Generate Node", func(t *testing.T) {
-		state := RAGState{
-			Query:     "test",
-			Documents: []RAGDocument{{Content: "context", Metadata: map[string]any{"source": "src1"}}},
+		state := map[string]any{
+			"query": "test",
+			"documents": []RAGDocument{{Content: "context", Metadata: map[string]any{"source": "src1"}}},
 		}
 		res, err := p.generateNode(ctx, state)
 		assert.NoError(t, err)
-		s := res.(RAGState)
-		assert.Equal(t, "Mock Answer", s.Answer)
+		answer, _ := res["answer"].(string)
+		assert.Equal(t, "Mock Answer", answer)
 	})
 
 	t.Run("Format Citations Node", func(t *testing.T) {
-		state := RAGState{
-			Documents: []RAGDocument{{Metadata: map[string]any{"source": "src1"}}},
+		state := map[string]any{
+			"documents": []RAGDocument{{Metadata: map[string]any{"source": "src1"}}},
 		}
 		res, err := p.formatCitationsNode(ctx, state)
 		assert.NoError(t, err)
-		s := res.(RAGState)
-		assert.Len(t, s.Citations, 1)
-		assert.Contains(t, s.Citations[0], "src1")
+		citations, _ := res["citations"].([]string)
+		assert.Len(t, citations, 1)
+		assert.Contains(t, citations[0], "src1")
 	})
 }
 
@@ -112,29 +112,30 @@ func TestRAGPipelineBuilds(t *testing.T) {
 func TestRerankNode(t *testing.T) {
 	ctx := context.Background()
 	p := NewRAGPipeline(nil)
-	state := RAGState{
-		RetrievedDocuments: []RAGDocument{{Content: "doc1"}},
+	state := map[string]any{
+		"retrieved_documents": []RAGDocument{{Content: "doc1"}},
 	}
 	res, err := p.rerankNode(ctx, state)
 	assert.NoError(t, err)
-	s := res.(RAGState)
-	assert.Len(t, s.RankedDocuments, 1)
+	rankedDocs, _ := res["ranked_documents"].([]DocumentSearchResult)
+	assert.Len(t, rankedDocs, 1)
 }
 
 func TestRAGStateSchema(t *testing.T) {
 	s := &ragStateSchema{}
-	init := s.Init().(RAGState)
-	assert.NotNil(t, init.Metadata)
+	init := s.Init()
+	assert.NotNil(t, init["metadata"])
 
-	update := RAGState{
-		Query:    "new query",
-		Metadata: map[string]any{"key": "val"},
+	update := map[string]any{
+		"query":    "new query",
+		"metadata": map[string]any{"key": "val"},
 	}
 	merged, err := s.Update(init, update)
 	assert.NoError(t, err)
-	m := merged.(RAGState)
-	assert.Equal(t, "new query", m.Query)
-	assert.Equal(t, "val", m.Metadata["key"])
+	query, _ := merged["query"].(string)
+	metadata, _ := merged["metadata"].(map[string]any)
+	assert.Equal(t, "new query", query)
+	assert.Equal(t, "val", metadata["key"])
 }
 
 func TestBaseEngine(t *testing.T) {

@@ -86,8 +86,7 @@ func TestCreateAgent(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify Result
-	mState := res.(map[string]any)
-	messages := mState["messages"].([]llms.MessageContent)
+	messages := res["messages"].([]llms.MessageContent)
 
 	// Expected messages:
 	// 0: Human "Run tool"

@@ -8,19 +8,19 @@ import (
 )
 
 func TestRuntimeConfiguration(t *testing.T) {
-	g := NewStateGraph()
+	g := NewStateGraph[map[string]any]()
 
 	// Define a node that reads config from context
-	g.AddNode("reader", "reader", func(ctx context.Context, state any) (any, error) {
+	g.AddNode("reader", "reader", func(ctx context.Context, state map[string]any) (map[string]any, error) {
 		config := GetConfig(ctx)
 		if config == nil {
-			return "no config", nil
+			return map[string]any{"result": "no config"}, nil
 		}
 
 		if val, ok := config.Configurable["model"]; ok {
-			return val, nil
+			return map[string]any{"result": val}, nil
 		}
-		return "key not found", nil
+		return map[string]any{"result": "key not found"}, nil
 	})
 
 	g.SetEntryPoint("reader")
@@ -38,27 +38,27 @@ func TestRuntimeConfiguration(t *testing.T) {
 
 	result, err := runnable.InvokeWithConfig(context.Background(), nil, config)
 	assert.NoError(t, err)
-	assert.Equal(t, "gpt-4", result)
+	assert.Equal(t, "gpt-4", result["result"])
 
 	// Test without config
 	result, err = runnable.Invoke(context.Background(), nil)
 	assert.NoError(t, err)
-	assert.Equal(t, "no config", result)
+	assert.Equal(t, "no config", result["result"])
 }
 
 func TestStateGraph_RuntimeConfiguration(t *testing.T) {
-	g := NewStateGraph()
+	g := NewStateGraph[map[string]any]()
 
-	g.AddNode("reader", "reader", func(ctx context.Context, state any) (any, error) {
+	g.AddNode("reader", "reader", func(ctx context.Context, state map[string]any) (map[string]any, error) {
 		config := GetConfig(ctx)
 		if config == nil {
-			return "no config", nil
+			return map[string]any{"result": "no config"}, nil
 		}
 
 		if val, ok := config.Configurable["api_key"]; ok {
-			return val, nil
+			return map[string]any{"result": val}, nil
 		}
-		return "key not found", nil
+		return map[string]any{"result": "key not found"}, nil
 	})
 
 	g.SetEntryPoint("reader")
@@ -75,5 +75,5 @@ func TestStateGraph_RuntimeConfiguration(t *testing.T) {
 
 	result, err := runnable.InvokeWithConfig(context.Background(), nil, config)
 	assert.NoError(t, err)
-	assert.Equal(t, "secret-123", result)
+	assert.Equal(t, "secret-123", result["result"])
 }

@@ -64,9 +64,9 @@ func runCLI(query string) {
 		log.Fatalf("Graph execution failed: %v", err)
 	}
 
-	finalState := result.(*State)
+	// result is now *State, no type assertion needed
 	fmt.Println("\n=== Final Report ===")
-	fmt.Println(finalState.FinalReport)
+	fmt.Println(result.FinalReport)
 }
 
 func runServer() {
@@ -145,7 +145,7 @@ func handleRun(w http.ResponseWriter, r *http.Request) {
 			errChan <- err
 			return
 		}
-		resultChan <- res.(*State)
+		resultChan <- res // res is already *State, no type assertion needed
 	}()
 
 	var capturedLogs []string

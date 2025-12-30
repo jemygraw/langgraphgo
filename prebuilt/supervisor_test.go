@@ -85,15 +85,24 @@ func (a *MockAgent) Invoke(ctx context.Context, state any) (any, error) {
 	}, nil
 }
 
-func (a *MockAgent) Compile() (*graph.StateRunnable, error) {
-	workflow := graph.NewStateGraph()
+func (a *MockAgent) Compile() (*graph.StateRunnable[map[string]any], error) {
+	workflow := graph.NewStateGraph[map[string]any]()
 
 	// Define state schema
 	schema := graph.NewMapSchema()
 	schema.RegisterReducer("messages", graph.AppendReducer)
-	workflow.SetSchema(schema)
+	workflow.SetSchema(&graph.MapSchemaAdapter{Schema: schema})
 
-	workflow.AddNode("run", "Agent run node", a.Invoke)
+	workflow.AddNode("run", "Agent run node", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		result, err := a.Invoke(ctx, state)
+		if err != nil {
+			return nil, err
+		}
+		if m, ok := result.(map[string]any); ok {
+			return m, nil
+		}
+		return state, nil
+	})
 	workflow.SetEntryPoint("run")
 	workflow.AddEdge("run", graph.END)
 
@@ -125,7 +134,7 @@ func TestCreateSupervisor_DirectFinish(t *testing.T) {
 	agentRunnable, err := agent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnable{
+	members := map[string]*graph.StateRunnable[map[string]any]{
 		"Agent": agentRunnable,
 	}
 	supervisor, err := CreateSupervisor(mockLLM, members)
@@ -140,12 +149,11 @@ func TestCreateSupervisor_DirectFinish(t *testing.T) {
 	res, err := supervisor.Invoke(context.Background(), initialState)
 	assert.NoError(t, err)
 
-	mState := res.(map[string]any)
-	messages := mState["messages"].([]llms.MessageContent)
+	messages := res["messages"].([]llms.MessageContent)
 	// Should only have initial message, no agent responses
 	assert.Equal(t, 1, len(messages))
 	assert.Equal(t, "Complete immediately", messages[0].Parts[0].(llms.TextContent).Text)
-	assert.Equal(t, "FINISH", mState["next"])
+	assert.Equal(t, "FINISH", res["next"])
 }
 
 func TestCreateSupervisor_AgentError(t *testing.T) {
@@ -173,7 +181,7 @@ func TestCreateSupervisor_AgentError(t *testing.T) {
 	errorAgentRunnable, err := errorAgent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnable{
+	members := map[string]*graph.StateRunnable[map[string]any]{
 		"ErrorAgent": errorAgentRunnable,
 	}
 	supervisor, err := CreateSupervisor(mockLLM, members)
@@ -209,7 +217,7 @@ func TestCreateSupervisor_NoToolCall(t *testing.T) {
 	agentRunnable, err := agent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnable{
+	members := map[string]*graph.StateRunnable[map[string]any]{
 		"Agent": agentRunnable,
 	}
 	supervisor, err := CreateSupervisor(mockLLM, members)
@@ -252,7 +260,7 @@ func TestCreateSupervisor_InvalidRouteArguments(t *testing.T) {
 	agentRunnable, err := agent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnable{
+	members := map[string]*graph.StateRunnable[map[string]any]{
 		"Agent": agentRunnable,
 	}
 	supervisor, err := CreateSupervisor(mockLLM, members)
@@ -293,16 +301,15 @@ func TestCreateSupervisor_InvalidStateType(t *testing.T) {
 	agentRunnable, err := agent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnable{
+	members := map[string]*graph.StateRunnable[map[string]any]{
 		"Agent1": agentRunnable,
 	}
 	supervisor, err := CreateSupervisor(mockLLM, members)
 	assert.NoError(t, err)
 
-	// Pass invalid state (string instead of map)
-	_, err = supervisor.Invoke(context.Background(), "invalid state")
+	// Pass state without messages key
+	_, err = supervisor.Invoke(context.Background(), map[string]any{"foo": "bar"})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid state type")
 }
 
 func TestCreateSupervisor_MissingMessages(t *testing.T) {
@@ -329,7 +336,7 @@ func TestCreateSupervisor_MissingMessages(t *testing.T) {
 	agentRunnable, err := agent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnable{
+	members := map[string]*graph.StateRunnable[map[string]any]{
 		"Agent1": agentRunnable,
 	}
 	supervisor, err := CreateSupervisor(mockLLM, members)
@@ -355,7 +362,7 @@ func TestCreateSupervisor_LLMError(t *testing.T) {
 	agentRunnable, err := agent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnable{
+	members := map[string]*graph.StateRunnable[map[string]any]{
 		"Agent": agentRunnable,
 	}
 	supervisor, err := CreateSupervisor(mockLLM, members)
@@ -394,7 +401,7 @@ func TestCreateSupervisor_EmptyMembers(t *testing.T) {
 	}
 
 	// Empty members map
-	members := map[string]*graph.StateRunnable{}
+	members := map[string]*graph.StateRunnable[map[string]any]{}
 	supervisor, err := CreateSupervisor(mockLLM, members)
 	assert.NoError(t, err)
 
@@ -407,10 +414,9 @@ func TestCreateSupervisor_EmptyMembers(t *testing.T) {
 	res, err := supervisor.Invoke(context.Background(), initialState)
 	assert.NoError(t, err)
 
-	mState := res.(map[string]any)
-	messages := mState["messages"].([]llms.MessageContent)
+	messages := res["messages"].([]llms.MessageContent)
 	assert.Equal(t, 1, len(messages)) // Only initial message
-	assert.Equal(t, "FINISH", mState["next"])
+	assert.Equal(t, "FINISH", res["next"])
 }
 
 func TestCreateSupervisor_UnknownAgent(t *testing.T) {
@@ -438,7 +444,7 @@ func TestCreateSupervisor_UnknownAgent(t *testing.T) {
 	agentRunnable, err := agent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnable{
+	members := map[string]*graph.StateRunnable[map[string]any]{
 		"KnownAgent": agentRunnable,
 	}
 	supervisor, err := CreateSupervisor(mockLLM, members)
@@ -478,7 +484,7 @@ func TestCreateSupervisor_RouteWithoutFunctionCall(t *testing.T) {
 	agentRunnable, err := agent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnable{
+	members := map[string]*graph.StateRunnable[map[string]any]{
 		"Agent": agentRunnable,
 	}
 	supervisor, err := CreateSupervisor(mockLLM, members)
@@ -508,7 +514,7 @@ func TestCreateSupervisor_NoChoices(t *testing.T) {
 	agentRunnable, err := agent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnable{
+	members := map[string]*graph.StateRunnable[map[string]any]{
 		"Agent": agentRunnable,
 	}
 	supervisor, err := CreateSupervisor(mockLLM, members)
@@ -549,7 +555,7 @@ func TestCreateSupervisor_EmptyRouteName(t *testing.T) {
 	agentRunnable, err := agent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnable{
+	members := map[string]*graph.StateRunnable[map[string]any]{
 		"Agent": agentRunnable,
 	}
 	supervisor, err := CreateSupervisor(mockLLM, members)
@@ -605,7 +611,7 @@ func TestCreateSupervisor_SingleAgent(t *testing.T) {
 	agentRunnable, err := agent.Compile()
 	require.NoError(t, err)
 
-	members := map[string]*graph.StateRunnable{
+	members := map[string]*graph.StateRunnable[map[string]any]{
 		"Worker": agentRunnable,
 	}
 	supervisor, err := CreateSupervisor(mockLLM, members)
@@ -620,8 +626,7 @@ func TestCreateSupervisor_SingleAgent(t *testing.T) {
 	res, err := supervisor.Invoke(context.Background(), initialState)
 	assert.NoError(t, err)
 
-	mState := res.(map[string]any)
-	messages := mState["messages"].([]llms.MessageContent)
+	messages := res["messages"].([]llms.MessageContent)
 	// Should have initial + worker message + potential routing messages
 	assert.True(t, len(messages) >= 2)
 	assert.Equal(t, "Single task", messages[0].Parts[0].(llms.TextContent).Text)

@@ -92,7 +92,7 @@ func (rn *RetryNode) Execute(ctx context.Context, state any) (any, error) {
 }
 
 // AddNodeWithRetry adds a node with retry logic
-func (g *StateGraph) AddNodeWithRetry(
+func (g *StateGraphUntyped) AddNodeWithRetry(
 	name string,
 	description string,
 	fn func(context.Context, any) (any, error),
@@ -104,7 +104,7 @@ func (g *StateGraph) AddNodeWithRetry(
 		Function:    fn,
 	}
 	retryNode := NewRetryNode(node, config)
-	g.AddNode(name, description, retryNode.Execute)
+	g.AddNodeUntyped(name, description, retryNode.Execute)
 }
 
 // TimeoutNode wraps a node with timeout logic
@@ -150,7 +150,7 @@ func (tn *TimeoutNode) Execute(ctx context.Context, state any) (any, error) {
 }
 
 // AddNodeWithTimeout adds a node with timeout
-func (g *StateGraph) AddNodeWithTimeout(
+func (g *StateGraphUntyped) AddNodeWithTimeout(
 	name string,
 	description string,
 	fn func(context.Context, any) (any, error),
@@ -162,7 +162,7 @@ func (g *StateGraph) AddNodeWithTimeout(
 		Function:    fn,
 	}
 	timeoutNode := NewTimeoutNode(node, timeout)
-	g.AddNode(name, description, timeoutNode.Execute)
+	g.AddNodeUntyped(name, description, timeoutNode.Execute)
 }
 
 // CircuitBreakerConfig configures circuit breaker behavior
@@ -253,7 +253,7 @@ func (cb *CircuitBreaker) Execute(ctx context.Context, state any) (any, error) {
 }
 
 // AddNodeWithCircuitBreaker adds a node with circuit breaker
-func (g *StateGraph) AddNodeWithCircuitBreaker(
+func (g *StateGraphUntyped) AddNodeWithCircuitBreaker(
 	name string,
 	description string,
 	fn func(context.Context, any) (any, error),
@@ -265,7 +265,7 @@ func (g *StateGraph) AddNodeWithCircuitBreaker(
 		Function:    fn,
 	}
 	cb := NewCircuitBreaker(node, config)
-	g.AddNode(name, description, cb.Execute)
+	g.AddNodeUntyped(name, description, cb.Execute)
 }
 
 // RateLimiter implements rate limiting for nodes
@@ -315,7 +315,7 @@ func (rl *RateLimiter) Execute(ctx context.Context, state any) (any, error) {
 }
 
 // AddNodeWithRateLimit adds a node with rate limiting
-func (g *StateGraph) AddNodeWithRateLimit(
+func (g *StateGraphUntyped) AddNodeWithRateLimit(
 	name string,
 	description string,
 	fn func(context.Context, any) (any, error),
@@ -328,7 +328,7 @@ func (g *StateGraph) AddNodeWithRateLimit(
 		Function:    fn,
 	}
 	rl := NewRateLimiter(node, maxCalls, window)
-	g.AddNode(name, description, rl.Execute)
+	g.AddNodeUntyped(name, description, rl.Execute)
 }
 
 // ExponentialBackoffRetry implements exponential backoff with jitter

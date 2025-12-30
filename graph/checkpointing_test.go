@@ -439,14 +439,14 @@ func TestCheckpointableRunnable_Basic(t *testing.T) {
 	t.Parallel()
 
 	// Create graph
-	g := graph.NewListenableStateGraph()
+	g := graph.NewListenableStateGraphUntyped()
 
-	g.AddNode("step1", "step1", func(ctx context.Context, state any) (any, error) {
-		return "step1_result", nil
+	g.AddNodeUntyped("step1", "step1", func(ctx context.Context, state any) (any, error) {
+		return map[string]any{"result": "step1_result"}, nil
 	})
 
-	g.AddNode("step2", "step2", func(ctx context.Context, state any) (any, error) {
-		return "step2_result", nil
+	g.AddNodeUntyped("step2", "step2", func(ctx context.Context, state any) (any, error) {
+		return map[string]any{"result": "step2_result"}, nil
 	})
 
 	g.AddEdge("step1", "step2")
@@ -464,13 +464,14 @@ func TestCheckpointableRunnable_Basic(t *testing.T) {
 	checkpointableRunnable := graph.NewCheckpointableRunnable(listenableRunnable, config)
 
 	ctx := context.Background()
-	result, err := checkpointableRunnable.Invoke(ctx, "input")
+	result, err := checkpointableRunnable.Invoke(ctx, map[string]any{})
 	if err != nil {
 		t.Fatalf("Execution failed: %v", err)
 	}
 
-	if result != "step2_result" {
-		t.Errorf("Expected 'step2_result', got %v", result)
+	resultMap := result.(map[string]any)
+	if resultMap["result"] != "step2_result" {
+		t.Errorf("Expected 'step2_result', got %v", resultMap)
 	}
 
 	// Wait for async checkpoint operations
@@ -506,9 +507,9 @@ func TestCheckpointableRunnable_Basic(t *testing.T) {
 func TestCheckpointableRunnable_ManualCheckpoint(t *testing.T) {
 	t.Parallel()
 
-	g := graph.NewListenableStateGraph()
-	g.AddNode(testNode, testNode, func(ctx context.Context, state any) (any, error) {
-		return testResult, nil
+	g := graph.NewListenableStateGraphUntyped()
+	g.AddNodeUntyped(testNode, testNode, func(ctx context.Context, state any) (any, error) {
+		return map[string]any{"result": testResult}, nil
 	})
 	g.AddEdge(testNode, graph.END)
 	g.SetEntryPoint(testNode)
@@ -524,7 +525,7 @@ func TestCheckpointableRunnable_ManualCheckpoint(t *testing.T) {
 	ctx := context.Background()
 
 	// Manual checkpoint save
-	err = checkpointableRunnable.SaveCheckpoint(ctx, testNode, "manual_state")
+	err = checkpointableRunnable.SaveCheckpoint(ctx, testNode, map[string]any{"result": "manual_state"})
 	if err != nil {
 		t.Fatalf("Failed to save manual checkpoint: %v", err)
 	}
@@ -543,7 +544,11 @@ func TestCheckpointableRunnable_ManualCheckpoint(t *testing.T) {
 		t.Errorf("Expected node name 'test_node', got %s", checkpoint.NodeName)
 	}
 
-	if checkpoint.State != "manual_state" {
+	stateMap, ok := checkpoint.State.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected state to be map[string]any, got %T", checkpoint.State)
+	}
+	if stateMap["result"] != "manual_state" {
 		t.Errorf("Expected state 'manual_state', got %v", checkpoint.State)
 	}
 }
@@ -551,9 +556,9 @@ func TestCheckpointableRunnable_ManualCheckpoint(t *testing.T) {
 func TestCheckpointableRunnable_LoadCheckpoint(t *testing.T) {
 	t.Parallel()
 
-	g := graph.NewListenableStateGraph()
-	g.AddNode(testNode, testNode, func(ctx context.Context, state any) (any, error) {
-		return testResult, nil
+	g := graph.NewListenableStateGraphUntyped()
+	g.AddNodeUntyped(testNode, testNode, func(ctx context.Context, state any) (any, error) {
+		return map[string]any{"result": testResult}, nil
 	})
 	g.AddEdge(testNode, graph.END)
 	g.SetEntryPoint(testNode)
@@ -569,7 +574,7 @@ func TestCheckpointableRunnable_LoadCheckpoint(t *testing.T) {
 	ctx := context.Background()
 
 	// Save checkpoint
-	err = checkpointableRunnable.SaveCheckpoint(ctx, testNode, "saved_state")
+	err = checkpointableRunnable.SaveCheckpoint(ctx, testNode, map[string]any{"result": "saved_state"})
 	if err != nil {
 		t.Fatalf("Failed to save checkpoint: %v", err)
 	}
@@ -591,7 +596,11 @@ func TestCheckpointableRunnable_LoadCheckpoint(t *testing.T) {
 		t.Fatalf("Failed to load checkpoint: %v", err)
 	}
 
-	if loaded.State != "saved_state" {
+	stateMap, ok := loaded.State.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected loaded state to be map[string]any, got %T", loaded.State)
+	}
+	if stateMap["result"] != "saved_state" {
 		t.Errorf("Expected loaded state 'saved_state', got %v", loaded.State)
 	}
 }
@@ -599,9 +608,9 @@ func TestCheckpointableRunnable_LoadCheckpoint(t *testing.T) {
 func TestCheckpointableRunnable_ClearCheckpoints(t *testing.T) {
 	t.Parallel()
 
-	g := graph.NewListenableStateGraph()
-	g.AddNode(testNode, testNode, func(ctx context.Context, state any) (any, error) {
-		return testResult, nil
+	g := graph.NewListenableStateGraphUntyped()
+	g.AddNodeUntyped(testNode, testNode, func(ctx context.Context, state any) (any, error) {
+		return map[string]any{"result": testResult}, nil
 	})
 	g.AddEdge(testNode, graph.END)
 	g.SetEntryPoint(testNode)
@@ -617,12 +626,12 @@ func TestCheckpointableRunnable_ClearCheckpoints(t *testing.T) {
 	ctx := context.Background()
 
 	// Save some checkpoints
-	err = checkpointableRunnable.SaveCheckpoint(ctx, "test_node1", "state1")
+	err = checkpointableRunnable.SaveCheckpoint(ctx, "test_node1", map[string]any{"result": "state1"})
 	if err != nil {
 		t.Fatalf("Failed to save checkpoint 1: %v", err)
 	}
 
-	err = checkpointableRunnable.SaveCheckpoint(ctx, "test_node2", "state2")
+	err = checkpointableRunnable.SaveCheckpoint(ctx, "test_node2", map[string]any{"result": "state2"})
 	if err != nil {
 		t.Fatalf("Failed to save checkpoint 2: %v", err)
 	}
@@ -659,8 +668,8 @@ func TestCheckpointableStateGraph_CompileCheckpointable(t *testing.T) {
 
 	g := graph.NewCheckpointableStateGraph()
 
-	g.AddNode(testNode, testNode, func(ctx context.Context, state any) (any, error) {
-		return testResult, nil
+	g.AddNodeUntyped(testNode, testNode, func(ctx context.Context, state any) (any, error) {
+		return map[string]any{"result": testResult}, nil
 	})
 	g.AddEdge(testNode, graph.END)
 	g.SetEntryPoint(testNode)
@@ -671,13 +680,14 @@ func TestCheckpointableStateGraph_CompileCheckpointable(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	result, err := checkpointableRunnable.Invoke(ctx, "input")
+	result, err := checkpointableRunnable.Invoke(ctx, map[string]any{})
 	if err != nil {
 		t.Fatalf("Execution failed: %v", err)
 	}
 
-	if result != testResult {
-		t.Errorf("Expected 'test_result', got %v", result)
+	resultMap := result.(map[string]any)
+	if resultMap["result"] != testResult {
+		t.Errorf("Expected 'test_result', got %v", resultMap)
 	}
 }
 
@@ -719,22 +729,22 @@ func TestCheckpointing_Integration(t *testing.T) {
 	g := graph.NewCheckpointableStateGraph()
 
 	// Build a multi-step pipeline
-	g.AddNode("analyze", "analyze", func(ctx context.Context, state any) (any, error) {
-		data := state.(map[string]any)
-		data["analyzed"] = true
-		return data, nil
+	g.AddNodeUntyped("analyze", "analyze", func(ctx context.Context, state any) (any, error) {
+		m := state.(map[string]any)
+		m["analyzed"] = true
+		return m, nil
 	})
 
-	g.AddNode("process", "process", func(ctx context.Context, state any) (any, error) {
-		data := state.(map[string]any)
-		data["processed"] = true
-		return data, nil
+	g.AddNodeUntyped("process", "process", func(ctx context.Context, state any) (any, error) {
+		m := state.(map[string]any)
+		m["processed"] = true
+		return m, nil
 	})
 
-	g.AddNode("finalize", "finalize", func(ctx context.Context, state any) (any, error) {
-		data := state.(map[string]any)
-		data["finalized"] = true
-		return data, nil
+	g.AddNodeUntyped("finalize", "finalize", func(ctx context.Context, state any) (any, error) {
+		m := state.(map[string]any)
+		m["finalized"] = true
+		return m, nil
 	})
 
 	g.AddEdge("analyze", "process")
@@ -826,10 +836,10 @@ func TestCheckpointing_Integration(t *testing.T) {
 func TestCheckpointListener_ErrorHandling(t *testing.T) {
 	t.Parallel()
 
-	g := graph.NewListenableStateGraph()
+	g := graph.NewListenableStateGraphUntyped()
 
 	// Node that will fail
-	g.AddNode("failing_node", "failing_node", func(ctx context.Context, state any) (any, error) {
+	g.AddNodeUntyped("failing_node", "failing_node", func(ctx context.Context, state any) (any, error) {
 		return nil, fmt.Errorf("simulated failure")
 	})
 
@@ -847,7 +857,7 @@ func TestCheckpointListener_ErrorHandling(t *testing.T) {
 	ctx := context.Background()
 
 	// This should fail
-	_, err = checkpointableRunnable.Invoke(ctx, "input")
+	_, err = checkpointableRunnable.Invoke(ctx, map[string]any{})
 	if err == nil {
 		t.Error("Expected execution to fail")
 	}

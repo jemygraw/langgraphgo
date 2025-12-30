@@ -8,10 +8,10 @@ import (
 
 func TestStateGraph_Interrupt(t *testing.T) {
 	// Create a StateGraph
-	g := NewStateGraph()
+	g := NewStateGraph[map[string]any]()
 
 	// Add node that uses Interrupt
-	g.AddNode("node1", "Node with interrupt", func(ctx context.Context, state any) (any, error) {
+	g.AddNode("node1", "Node with interrupt", func(ctx context.Context, state map[string]any) (map[string]any, error) {
 		// Use the Interrupt function
 		resumeValue, err := Interrupt(ctx, "waiting for input")
 		if err != nil {
@@ -19,9 +19,9 @@ func TestStateGraph_Interrupt(t *testing.T) {
 		}
 		// If we resumed, return the resume value
 		if resumeValue != nil {
-			return resumeValue, nil
+			return map[string]any{"value": resumeValue}, nil
 		}
-		return "default", nil
+		return map[string]any{"value": "default"}, nil
 	})
 
 	g.AddEdge("node1", END)
@@ -33,7 +33,7 @@ func TestStateGraph_Interrupt(t *testing.T) {
 	}
 
 	// First execution should interrupt
-	_, err = runnable.Invoke(context.Background(), "initial")
+	_, err = runnable.Invoke(context.Background(), map[string]any{"initial": true})
 
 	// Verify we got an interrupt error
 	var graphInterrupt *GraphInterrupt

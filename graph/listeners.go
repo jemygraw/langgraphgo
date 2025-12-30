@@ -2,7 +2,6 @@ package graph
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 )
@@ -184,105 +183,24 @@ func (ln *ListenableNode) GetListeners() []NodeListener {
 	return listeners
 }
 
-// ListenableStateGraph extends StateGraph with listener capabilities
-type ListenableStateGraph struct {
-	*StateGraph
-	listenableNodes map[string]*ListenableNode
-}
-
-// NewListenableStateGraph creates a new state graph with listener support
-func NewListenableStateGraph() *ListenableStateGraph {
-	return &ListenableStateGraph{
-		StateGraph:      NewStateGraph(),
-		listenableNodes: make(map[string]*ListenableNode),
-	}
-}
-
-// AddNode adds a node with listener capabilities
-func (g *ListenableStateGraph) AddNode(name string, description string, fn func(ctx context.Context, state any) (any, error)) *ListenableNode {
-	node := Node{
-		Name:        name,
-		Description: description,
-		Function:    fn,
-	}
-
-	listenableNode := NewListenableNode(node)
-
-	// Add to both the base graph and our listenable nodes map
-	g.StateGraph.AddNode(name, description, fn)
-	g.listenableNodes[name] = listenableNode
-
-	return listenableNode
-}
-
-// GetListenableNode returns the listenable node by name
-func (g *ListenableStateGraph) GetListenableNode(name string) *ListenableNode {
-	return g.listenableNodes[name]
-}
-
-// AddGlobalListener adds a listener to all nodes in the graph
-func (g *ListenableStateGraph) AddGlobalListener(listener NodeListener) {
-	for _, node := range g.listenableNodes {
-		node.AddListener(listener)
-	}
-}
-
-// RemoveGlobalListener removes a listener from all nodes in the graph
-func (g *ListenableStateGraph) RemoveGlobalListener(listener NodeListener) {
-	for _, node := range g.listenableNodes {
-		node.RemoveListener(listener)
-	}
-}
-
-// ListenableRunnable wraps a Runnable with listener capabilities
-type ListenableRunnable struct {
-	graph           *ListenableStateGraph
-	listenableNodes map[string]*ListenableNode
-	runnable        *StateRunnable
-}
-
-// CompileListenable creates a runnable with listener support
-func (g *ListenableStateGraph) CompileListenable() (*ListenableRunnable, error) {
-	if g.entryPoint == "" {
-		return nil, ErrEntryPointNotSet
-	}
-
-	runnable, err := g.StateGraph.Compile()
-	if err != nil {
-		return nil, err
-	}
-
-	// Configure the runnable to use our listenable nodes
-	nodes := g.listenableNodes
-	runnable.nodeRunner = func(ctx context.Context, nodeName string, state any) (any, error) {
-		node, ok := nodes[nodeName]
-		if !ok {
-			return nil, fmt.Errorf("%w: %s", ErrNodeNotFound, nodeName)
+// AddNodeUntyped adds a node with an untyped function signature to ListenableStateGraphUntyped.
+// This is a convenience method that accepts the legacy function signature
+// func(ctx context.Context, state any) (any, error).
+func (g *ListenableStateGraphUntyped) AddNodeUntyped(name string, description string, fn func(ctx context.Context, state any) (any, error)) *ListenableTypedNode[map[string]any] {
+	// Wrap the untyped function to match the typed signature
+	wrappedFn := func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		result, err := fn(ctx, state)
+		if err != nil {
+			return nil, err
 		}
-		return node.Execute(ctx, state)
+		if resultMap, ok := result.(map[string]any); ok {
+			return resultMap, nil
+		}
+		// If result is not a map, wrap it
+		return map[string]any{"value": result}, nil
 	}
 
-	return &ListenableRunnable{
-		graph:           g,
-		listenableNodes: g.listenableNodes,
-		runnable:        runnable,
-	}, nil
-}
-
-// Invoke executes the graph with listener notifications
-func (lr *ListenableRunnable) Invoke(ctx context.Context, initialState any) (any, error) {
-	return lr.runnable.Invoke(ctx, initialState)
-}
-
-// InvokeWithConfig executes the graph with listener notifications and config
-func (lr *ListenableRunnable) InvokeWithConfig(ctx context.Context, initialState any, config *Config) (any, error) {
-	if config != nil {
-		ctx = WithConfig(ctx, config)
-	}
-	return lr.runnable.InvokeWithConfig(ctx, initialState, config)
-}
-
-// GetGraph returns a Exporter for visualization
-func (lr *ListenableRunnable) GetGraph() *Exporter {
-	return NewExporter(lr.graph.StateGraph)
+	// Add node to the typed listenable graph via the embedded field
+	// This will create a ListenableTypedNode[map[string]any]
+	return g.ListenableStateGraphMap.AddNode(name, description, wrappedFn)
 }

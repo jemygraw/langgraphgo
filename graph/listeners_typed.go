@@ -51,25 +51,25 @@ type listenerWrapper[S any] struct {
 	listener NodeListenerTyped[S]
 }
 
-// ListenableNodeTyped extends NodeTyped with listener capabilities
-type ListenableNodeTyped[S any] struct {
-	NodeTyped[S]
+// ListenableTypedNode extends TypedNode with listener capabilities
+type ListenableTypedNode[S any] struct {
+	TypedNode[S]
 	listeners []listenerWrapper[S]
 	mutex     sync.RWMutex
 	nextID    int64
 }
 
-// NewListenableNodeTyped creates a new listenable node from a regular typed node
-func NewListenableNodeTyped[S any](node NodeTyped[S]) *ListenableNodeTyped[S] {
-	return &ListenableNodeTyped[S]{
-		NodeTyped: node,
+// NewListenableTypedNode creates a new listenable node from a regular typed node
+func NewListenableTypedNode[S any](node TypedNode[S]) *ListenableTypedNode[S] {
+	return &ListenableTypedNode[S]{
+		TypedNode: node,
 		listeners: make([]listenerWrapper[S], 0),
 		nextID:    1,
 	}
 }
 
 // AddListener adds a listener to the node and returns the listenable node for chaining
-func (ln *ListenableNodeTyped[S]) AddListener(listener NodeListenerTyped[S]) *ListenableNodeTyped[S] {
+func (ln *ListenableTypedNode[S]) AddListener(listener NodeListenerTyped[S]) *ListenableTypedNode[S] {
 	ln.mutex.Lock()
 	defer ln.mutex.Unlock()
 
@@ -84,7 +84,7 @@ func (ln *ListenableNodeTyped[S]) AddListener(listener NodeListenerTyped[S]) *Li
 }
 
 // AddListenerWithID adds a listener to the node and returns its ID
-func (ln *ListenableNodeTyped[S]) AddListenerWithID(listener NodeListenerTyped[S]) string {
+func (ln *ListenableTypedNode[S]) AddListenerWithID(listener NodeListenerTyped[S]) string {
 	ln.mutex.Lock()
 	defer ln.mutex.Unlock()
 
@@ -99,7 +99,7 @@ func (ln *ListenableNodeTyped[S]) AddListenerWithID(listener NodeListenerTyped[S
 }
 
 // RemoveListener removes a listener from the node by ID
-func (ln *ListenableNodeTyped[S]) RemoveListener(listenerID string) {
+func (ln *ListenableTypedNode[S]) RemoveListener(listenerID string) {
 	ln.mutex.Lock()
 	defer ln.mutex.Unlock()
 
@@ -112,7 +112,7 @@ func (ln *ListenableNodeTyped[S]) RemoveListener(listenerID string) {
 }
 
 // RemoveListenerByFunc removes a listener from the node by comparing pointer values
-func (ln *ListenableNodeTyped[S]) RemoveListenerByFunc(listener NodeListenerTyped[S]) {
+func (ln *ListenableTypedNode[S]) RemoveListenerByFunc(listener NodeListenerTyped[S]) {
 	ln.mutex.Lock()
 	defer ln.mutex.Unlock()
 
@@ -127,7 +127,7 @@ func (ln *ListenableNodeTyped[S]) RemoveListenerByFunc(listener NodeListenerType
 }
 
 // NotifyListeners notifies all listeners of an event
-func (ln *ListenableNodeTyped[S]) NotifyListeners(ctx context.Context, event NodeEvent, state S, err error) {
+func (ln *ListenableTypedNode[S]) NotifyListeners(ctx context.Context, event NodeEvent, state S, err error) {
 	ln.mutex.RLock()
 	wrappers := make([]listenerWrapper[S], len(ln.listeners))
 	copy(wrappers, ln.listeners)
@@ -159,7 +159,7 @@ func (ln *ListenableNodeTyped[S]) NotifyListeners(ctx context.Context, event Nod
 }
 
 // Execute runs the node function with listener notifications
-func (ln *ListenableNodeTyped[S]) Execute(ctx context.Context, state S) (S, error) {
+func (ln *ListenableTypedNode[S]) Execute(ctx context.Context, state S) (S, error) {
 	// Notify start
 	ln.NotifyListeners(ctx, NodeEventStart, state, nil)
 
@@ -177,7 +177,7 @@ func (ln *ListenableNodeTyped[S]) Execute(ctx context.Context, state S) (S, erro
 }
 
 // GetListeners returns a copy of the current listeners
-func (ln *ListenableNodeTyped[S]) GetListeners() []NodeListenerTyped[S] {
+func (ln *ListenableTypedNode[S]) GetListeners() []NodeListenerTyped[S] {
 	ln.mutex.RLock()
 	defer ln.mutex.RUnlock()
 
@@ -189,7 +189,7 @@ func (ln *ListenableNodeTyped[S]) GetListeners() []NodeListenerTyped[S] {
 }
 
 // GetListenerIDs returns a copy of the current listener IDs
-func (ln *ListenableNodeTyped[S]) GetListenerIDs() []string {
+func (ln *ListenableTypedNode[S]) GetListenerIDs() []string {
 	ln.mutex.RLock()
 	defer ln.mutex.RUnlock()
 
@@ -200,39 +200,39 @@ func (ln *ListenableNodeTyped[S]) GetListenerIDs() []string {
 	return ids
 }
 
-// ListenableStateGraphTyped extends StateGraphTyped with listener capabilities
+// ListenableStateGraph extends StateGraph with listener capabilities
 type ListenableStateGraphTyped[S any] struct {
-	*StateGraphTyped[S]
-	listenableNodes map[string]*ListenableNodeTyped[S]
+	*StateGraph[S]
+	listenableNodes map[string]*ListenableTypedNode[S]
 }
 
-// NewListenableStateGraphTyped creates a new typed state graph with listener support
+// NewListenableStateGraph creates a new typed state graph with listener support
 func NewListenableStateGraphTyped[S any]() *ListenableStateGraphTyped[S] {
 	return &ListenableStateGraphTyped[S]{
-		StateGraphTyped: NewStateGraphTyped[S](),
-		listenableNodes: make(map[string]*ListenableNodeTyped[S]),
+		StateGraph: NewStateGraph[S](),
+		listenableNodes: make(map[string]*ListenableTypedNode[S]),
 	}
 }
 
 // AddNode adds a node with listener capabilities
-func (g *ListenableStateGraphTyped[S]) AddNode(name string, description string, fn func(ctx context.Context, state S) (S, error)) *ListenableNodeTyped[S] {
-	node := NodeTyped[S]{
+func (g *ListenableStateGraphTyped[S]) AddNode(name string, description string, fn func(ctx context.Context, state S) (S, error)) *ListenableTypedNode[S] {
+	node := TypedNode[S]{
 		Name:        name,
 		Description: description,
 		Function:    fn,
 	}
 
-	listenableNode := NewListenableNodeTyped(node)
+	listenableNode := NewListenableTypedNode(node)
 
 	// Add to both the base graph and our listenable nodes map
-	g.StateGraphTyped.AddNode(name, description, fn)
+	g.StateGraph.AddNode(name, description, fn)
 	g.listenableNodes[name] = listenableNode
 
 	return listenableNode
 }
 
 // GetListenableNode returns the listenable node by name
-func (g *ListenableStateGraphTyped[S]) GetListenableNode(name string) *ListenableNodeTyped[S] {
+func (g *ListenableStateGraphTyped[S]) GetListenableNode(name string) *ListenableTypedNode[S] {
 	return g.listenableNodes[name]
 }
 
@@ -257,11 +257,11 @@ func (g *ListenableStateGraphTyped[S]) RemoveGlobalListenerByID(listenerID strin
 	}
 }
 
-// ListenableRunnableTyped wraps a StateRunnableTyped with listener capabilities
+// ListenableRunnableTyped wraps a StateRunnable with listener capabilities
 type ListenableRunnableTyped[S any] struct {
 	graph           *ListenableStateGraphTyped[S]
-	listenableNodes map[string]*ListenableNodeTyped[S]
-	runnable        *StateRunnableTyped[S]
+	listenableNodes map[string]*ListenableTypedNode[S]
+	runnable        *StateRunnable[S]
 }
 
 // CompileListenable creates a runnable with listener support
@@ -270,7 +270,7 @@ func (g *ListenableStateGraphTyped[S]) CompileListenable() (*ListenableRunnableT
 		return nil, ErrEntryPointNotSet
 	}
 
-	runnable, err := g.StateGraphTyped.Compile()
+	runnable, err := g.StateGraph.Compile()
 	if err != nil {
 		return nil, err
 	}
@@ -352,6 +352,11 @@ func (lr *ListenableRunnableTyped[S]) SetTracer(tracer *Tracer) {
 	lr.runnable.SetTracer(tracer)
 }
 
+// GetTracer returns the tracer from the underlying runnable
+func (lr *ListenableRunnableTyped[S]) GetTracer() *Tracer {
+	return lr.runnable.GetTracer()
+}
+
 // WithTracer returns a new ListenableRunnableTyped with the given tracer
 func (lr *ListenableRunnableTyped[S]) WithTracer(tracer *Tracer) *ListenableRunnableTyped[S] {
 	newRunnable := lr.runnable.WithTracer(tracer)
@@ -363,66 +368,22 @@ func (lr *ListenableRunnableTyped[S]) WithTracer(tracer *Tracer) *ListenableRunn
 }
 
 // GetGraph returns an Exporter for visualization
-func (lr *ListenableRunnableTyped[S]) GetGraph() *Exporter {
+func (lr *ListenableRunnableTyped[S]) GetGraph() *Exporter[S] {
 	// Convert the typed graph to a regular graph for visualization
 	regularGraph := lr.convertToRegularGraph()
-	return NewExporter(regularGraph)
+	return NewExporter[S](regularGraph)
 }
 
-// convertToRegularGraph converts a StateGraphTyped[S] to StateGraph for visualization
-func (lr *ListenableRunnableTyped[S]) convertToRegularGraph() *StateGraph {
-	regularGraph := NewStateGraph()
-	typedGraph := lr.graph.StateGraphTyped
+// GetListenableGraph returns the underlying ListenableStateGraphTyped
+func (lr *ListenableRunnableTyped[S]) GetListenableGraph() *ListenableStateGraphTyped[S] {
+	return lr.graph
+}
 
-	// Copy nodes
-	for name, typedNode := range typedGraph.nodes {
-		// Convert the typed node function to a regular function that accepts any
-		regularFunc := func(ctx context.Context, state any) (any, error) {
-			typedState, ok := state.(S)
-			if !ok {
-				// If state type doesn't match, create a zero value of S
-				var zero S
-				typedState = zero
-			}
-			return typedNode.Function(ctx, typedState)
-		}
-
-		regularGraph.AddNode(name, typedNode.Description, regularFunc)
-	}
-
-	// Copy edges
-	for _, edge := range typedGraph.edges {
-		regularGraph.AddEdge(edge.From, edge.To)
-	}
-
-	// Copy conditional edges
-	for from, condition := range typedGraph.conditionalEdges {
-		regularCondition := func(ctx context.Context, state any) string {
-			typedState, ok := state.(S)
-			if !ok {
-				// If state type doesn't match, create a zero value of S
-				var zero S
-				typedState = zero
-			}
-			return condition(ctx, typedState)
-		}
-		regularGraph.AddConditionalEdge(from, regularCondition)
-	}
-
-	// Set entry point
-	if typedGraph.entryPoint != "" {
-		regularGraph.SetEntryPoint(typedGraph.entryPoint)
-	}
-
-	// Copy retry policy
-	if typedGraph.retryPolicy != nil {
-		regularGraph.retryPolicy = typedGraph.retryPolicy
-	}
-
-	// Note: Schema and stateMerger are not copied as they are type-specific
-	// and primarily for execution, not visualization
-
-	return regularGraph
+// convertToRegularGraph converts a StateGraph[S] to StateGraph[map[string]any] for visualization
+func (lr *ListenableRunnableTyped[S]) convertToRegularGraph() *StateGraph[S] {
+	// For visualization of typed graphs, we just return the original graph
+	// The Exporter[S] can work with any StateGraph[S]
+	return lr.graph.StateGraph
 }
 
 // StreamingListenerTyped is a listener that streams node events

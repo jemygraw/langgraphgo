@@ -117,7 +117,7 @@
 // Example:
 //
 //	// Create a supervisor with multiple agents
-//	members := map[string]*graph.StateRunnable{
+//	members := map[string]*graph.StateRunnableUntyped
 //		"analyst":   analystAgent,
 //		"coder":     coderAgent,
 //		"reviewer":  reviewerAgent,
@@ -266,7 +266,7 @@
 //		critic, _ := prebuilt.CreateReactAgent(llm, criticTools, 5)
 //
 //		// Create supervisor
-//		members := map[string]*graph.StateRunnable{
+//		members := map[string]*graph.StateRunnableUntyped
 //			"researcher": researcher,
 //			"writer":    writer,
 //			"critic":    critic,
@@ -373,7 +373,7 @@
 //
 //	func main() {
 //		// Create typed graph
-//		g := graph.NewStateGraphTyped[WorkflowState]()
+//		g := graph.NewStateGraph[WorkflowState]()
 //
 //		// Add typed nodes
 //		g.AddNode("process", "Process the input", func(ctx context.Context, state WorkflowState) (WorkflowState, error) {
