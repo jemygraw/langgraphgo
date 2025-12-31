@@ -6,7 +6,6 @@ require (
 	github.com/PuerkitoBio/goquery v1.11.0
 	github.com/alicebob/miniredis/v2 v2.35.0
 	github.com/gomarkdown/markdown v0.0.0-20250810172220-2e2c11897d1a
-	github.com/gomodule/redigo v1.9.3
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/kataras/golog v0.1.15
@@ -19,6 +18,7 @@ require (
 	github.com/smallnest/goskills v0.4.1
 	github.com/stretchr/testify v1.11.1
 	github.com/tmc/langchaingo v0.1.14
+	github.com/volcengine/volcengine-go-sdk v1.2.1
 )
 
 require (
@@ -46,7 +46,6 @@ require (
 	github.com/pkoukk/tiktoken-go v0.1.6 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/volcengine/volc-sdk-golang v1.0.23 // indirect
-	github.com/volcengine/volcengine-go-sdk v1.2.1 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
 	gitlab.com/golang-commonmark/html v0.0.0-20191124015941-a22733972181 // indirect
