@@ -3,13 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/smallnest/langgraphgo/graph"
 	"github.com/tmc/langchaingo/llms"
@@ -18,9 +17,9 @@ import (
 
 // Server represents the HTTP server for the AI PDF Chatbot.
 type Server struct {
-	cfg         Config
-	vs          *VectorStore
-	ingestGraph *graph.StateRunnable[IngestionState]
+	cfg           Config
+	vs            *VectorStore
+	ingestGraph   *graph.StateRunnable[IngestionState]
 	retrieveGraph *graph.StateRunnable[RetrievalState]
 
 	// Session management
@@ -50,11 +49,11 @@ func NewServer(cfg Config) (*Server, error) {
 	}
 
 	return &Server{
-		cfg:          cfg,
-		vs:           vs,
-		ingestGraph:  ingestRunnable,
+		cfg:           cfg,
+		vs:            vs,
+		ingestGraph:   ingestRunnable,
 		retrieveGraph: retrieveRunnable,
-		sessions:     make(map[string][]llms.MessageContent),
+		sessions:      make(map[string][]llms.MessageContent),
 	}, nil
 }
 
@@ -72,7 +71,16 @@ func (s *Server) Start() error {
 	// Serve static files
 	http.HandleFunc("/static/", s.handleStatic)
 
-	return http.ListenAndServe(addr, nil)
+	// Create server with timeouts
+	server := &http.Server{
+		Addr:              addr,
+		ReadHeaderTimeout: 30 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+
+	return server.ListenAndServe()
 }
 
 // handleIndex serves the main HTML page.
@@ -98,11 +106,11 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	stats, _ := s.vs.GetStats(r.Context())
 
 	response := map[string]any{
-		"status": "ok",
+		"status":    "ok",
 		"documents": stats.TotalDocuments,
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // handleIngest handles document ingestion requests.
@@ -304,14 +312,14 @@ func sseEvent(w http.ResponseWriter, flusher http.Flusher, event string, data an
 // sendJSONResponse sends a JSON response.
 func sendJSONResponse(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(data)
+	_ = json.NewEncoder(w).Encode(data)
 }
 
 // sendJSONError sends a JSON error response.
 func sendJSONError(w http.ResponseWriter, message string, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]any{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"error": message,
 	})
 }
@@ -319,92 +327,4 @@ func sendJSONError(w http.ResponseWriter, message string, status int) {
 // generateSessionID generates a unique session ID.
 func generateSessionID() string {
 	return fmt.Sprintf("session_%d", len("session"))
-}
-
-// ============================================
-// File Upload Handler
-// ============================================
-
-// handleFileUpload handles multipart file uploads.
-func (s *Server) handleFileUpload(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Parse multipart form (max 32MB)
-	if err := r.ParseMultipartForm(32 << 20); err != nil {
-		http.Error(w, "Failed to parse form", http.StatusBadRequest)
-		return
-	}
-
-	files := r.MultipartForm.File["files"]
-	if len(files) == 0 {
-		http.Error(w, "No files uploaded", http.StatusBadRequest)
-		return
-	}
-
-	log.Printf("Received %d file(s)", len(files))
-
-	// Process uploaded files
-	var filePaths []string
-	for _, fileHeader := range files {
-		file, err := fileHeader.Open()
-		if err != nil {
-			log.Printf("Failed to open file %s: %v", fileHeader.Filename, err)
-			continue
-		}
-
-		// Save to temporary directory
-		tempPath := filepath.Join(os.TempDir(), fileHeader.Filename)
-		out, err := os.Create(tempPath)
-		if err != nil {
-			log.Printf("Failed to create temp file: %v", err)
-			file.Close()
-			continue
-		}
-
-		_, err = io.Copy(out, file)
-		file.Close()
-		out.Close()
-
-		if err != nil {
-			log.Printf("Failed to save file: %v", err)
-			continue
-		}
-
-		filePaths = append(filePaths, tempPath)
-		log.Printf("Saved file to: %s", tempPath)
-	}
-
-	// Ingest documents
-	ctx := r.Context()
-	var allDocs []schema.Document
-	for _, path := range filePaths {
-		docs, err := LoadDocumentsFromFile(path)
-		if err != nil {
-			log.Printf("Failed to load %s: %v", path, err)
-			continue
-		}
-		allDocs = append(allDocs, docs...)
-	}
-
-	if len(allDocs) == 0 {
-		sendJSONError(w, "No documents were successfully loaded", http.StatusBadRequest)
-		return
-	}
-
-	state := IngestionState{Docs: allDocs}
-	_, err := s.ingestGraph.Invoke(ctx, state)
-	if err != nil {
-		log.Printf("Ingestion failed: %v", err)
-		sendJSONError(w, "Ingestion failed", http.StatusInternalServerError)
-		return
-	}
-
-	sendJSONResponse(w, IngestResponse{
-		Success:           true,
-		Message:           fmt.Sprintf("Successfully ingested %d file(s)", len(filePaths)),
-		DocumentsIngested: len(allDocs),
-	})
 }
