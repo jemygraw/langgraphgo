@@ -24,6 +24,18 @@ Website: [http://lango.rpcx.io](http://lango.rpcx.io)
 go get github.com/smallnest/langgraphgo
 ```
 
+**Note**: This repository uses Git submodules for the `showcases` directory. When cloning, use one of the following methods:
+
+```bash
+# Method 1: Clone with submodules
+git clone --recurse-submodules https://github.com/smallnest/langgraphgo
+
+# Method 2: Clone first, then initialize submodules
+git clone https://github.com/smallnest/langgraphgo
+cd langgraphgo
+git submodule update --init --recursive
+```
+
 ## 🚀 Features
 
 - **Core Runtime**:

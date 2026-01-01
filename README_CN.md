@@ -23,6 +23,18 @@
 go get github.com/smallnest/langgraphgo
 ```
 
+**注意**：本仓库的 `showcases` 目录使用了 Git submodule。克隆仓库时，请使用以下方法之一：
+
+```bash
+# 方法 1: 克隆时同时初始化 submodule
+git clone --recurse-submodules https://github.com/smallnest/langgraphgo
+
+# 方法 2: 先克隆，再初始化 submodule
+git clone https://github.com/smallnest/langgraphgo
+cd langgraphgo
+git submodule update --init --recursive
+```
+
 ## 🚀 特性
 
 - **核心运行时**:
