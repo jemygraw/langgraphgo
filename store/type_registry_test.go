@@ -44,7 +44,7 @@ func TestTypeRegistry_RegisterType(t *testing.T) {
 	registry := newTestRegistry()
 
 	t.Run("Register struct type", func(t *testing.T) {
-		err := registry.RegisterTypeInternal(reflect.TypeOf(TestState{}), "TestState")
+		err := registry.RegisterTypeInternal(reflect.TypeFor[TestState](), "TestState")
 		assert.NoError(t, err)
 
 		// Verify we can retrieve it
@@ -54,7 +54,7 @@ func TestTypeRegistry_RegisterType(t *testing.T) {
 	})
 
 	t.Run("Register pointer to struct", func(t *testing.T) {
-		err := registry.RegisterTypeInternal(reflect.TypeOf(&PointerState{}), "PointerState")
+		err := registry.RegisterTypeInternal(reflect.TypeFor[*PointerState](), "PointerState")
 		assert.NoError(t, err)
 
 		// Verify we can retrieve it
@@ -64,14 +64,13 @@ func TestTypeRegistry_RegisterType(t *testing.T) {
 	})
 
 	t.Run("Register non-struct type should fail", func(t *testing.T) {
-		err := registry.RegisterTypeInternal(reflect.TypeOf("string"), "StringType")
+		err := registry.RegisterTypeInternal(reflect.TypeFor[string](), "StringType")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "must be a struct")
 	})
 
 	t.Run("Register pointer to non-struct should fail", func(t *testing.T) {
-		var ptr *int
-		err := registry.RegisterTypeInternal(reflect.TypeOf(ptr), "IntPtr")
+		err := registry.RegisterTypeInternal(reflect.TypeFor[*int](), "IntPtr")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "must be a struct")
 	})
@@ -79,19 +78,19 @@ func TestTypeRegistry_RegisterType(t *testing.T) {
 	t.Run("Register same type with different name should fail", func(t *testing.T) {
 		// Use a fresh registry for this test
 		registry2 := newTestRegistry()
-		err1 := registry2.RegisterTypeInternal(reflect.TypeOf(TestState{}), "TestState_First")
+		err1 := registry2.RegisterTypeInternal(reflect.TypeFor[TestState](), "TestState_First")
 		assert.NoError(t, err1)
 
-		err2 := registry2.RegisterTypeInternal(reflect.TypeOf(TestState{}), "TestState_Second")
+		err2 := registry2.RegisterTypeInternal(reflect.TypeFor[TestState](), "TestState_Second")
 		assert.Error(t, err2)
 		assert.Contains(t, err2.Error(), "already registered")
 	})
 
 	t.Run("Register same type with same name should succeed", func(t *testing.T) {
-		err1 := registry.RegisterTypeInternal(reflect.TypeOf(AnotherState{}), "AnotherState")
+		err1 := registry.RegisterTypeInternal(reflect.TypeFor[AnotherState](), "AnotherState")
 		assert.NoError(t, err1)
 
-		err2 := registry.RegisterTypeInternal(reflect.TypeOf(AnotherState{}), "AnotherState")
+		err2 := registry.RegisterTypeInternal(reflect.TypeFor[AnotherState](), "AnotherState")
 		assert.NoError(t, err2)
 	})
 }
@@ -100,7 +99,7 @@ func TestTypeRegistry_GetTypeName(t *testing.T) {
 	registry := newTestRegistry()
 
 	t.Run("Get existing type name", func(t *testing.T) {
-		typ := reflect.TypeOf(TestState{})
+		typ := reflect.TypeFor[TestState]()
 		registry.RegisterTypeInternal(typ, "TestState1")
 
 		name, ok := registry.GetTypeName(typ)
@@ -119,12 +118,12 @@ func TestTypeRegistry_GetTypeByName(t *testing.T) {
 	registry := newTestRegistry()
 
 	t.Run("Get existing type", func(t *testing.T) {
-		typ := reflect.TypeOf(TestState{})
+		typ := reflect.TypeFor[TestState]()
 		registry.RegisterTypeInternal(typ, "TestState2")
 
 		retrievedType, ok := registry.GetTypeByName("TestState2")
 		assert.True(t, ok)
-		assert.Equal(t, reflect.TypeOf(TestState{}), retrievedType)
+		assert.Equal(t, reflect.TypeFor[TestState](), retrievedType)
 	})
 
 	t.Run("Get non-existing type", func(t *testing.T) {
@@ -137,7 +136,7 @@ func TestTypeRegistry_CreateInstance(t *testing.T) {
 	registry := newTestRegistry()
 
 	t.Run("Create instance of registered type", func(t *testing.T) {
-		typ := reflect.TypeOf(TestState{})
+		typ := reflect.TypeFor[TestState]()
 		registry.RegisterTypeInternal(typ, "TestState3")
 
 		instance, err := registry.CreateInstance("TestState3")
@@ -160,7 +159,7 @@ func TestTypeRegistry_Marshal(t *testing.T) {
 	registry := newTestRegistry()
 
 	t.Run("Marshal registered type", func(t *testing.T) {
-		typ := reflect.TypeOf(TestState{})
+		typ := reflect.TypeFor[TestState]()
 		registry.RegisterTypeInternal(typ, "TestState4")
 
 		state := TestState{Name: "test", Count: 42}
@@ -208,7 +207,7 @@ func TestTypeRegistry_Marshal(t *testing.T) {
 func TestTypeRegistry_Unmarshal(t *testing.T) {
 	t.Run("Unmarshal registered type", func(t *testing.T) {
 		registry := newTestRegistry()
-		typ := reflect.TypeOf(TestState{})
+		typ := reflect.TypeFor[TestState]()
 		registry.RegisterTypeInternal(typ, "TestState5")
 
 		// Create wrapped data
@@ -235,7 +234,7 @@ func TestTypeRegistry_Unmarshal(t *testing.T) {
 	t.Run("Unmarshal unknown type", func(t *testing.T) {
 		registry := newTestRegistry()
 		wrapped := map[string]any{
-			"_type": "UnknownType",
+			"_type":  "UnknownType",
 			"_value": map[string]any{},
 		}
 		jsonData, _ := json.Marshal(wrapped)
@@ -261,7 +260,7 @@ func TestTypeRegistry_Unmarshal(t *testing.T) {
 	t.Run("Unmarshal wrapped data with missing _value", func(t *testing.T) {
 		registry := newTestRegistry()
 		// Register the type first so we can test missing _value
-		typ := reflect.TypeOf(TestState{})
+		typ := reflect.TypeFor[TestState]()
 		registry.RegisterTypeInternal(typ, "TestState6")
 
 		wrapped := map[string]any{
@@ -279,7 +278,7 @@ func TestTypeRegistry_CustomSerialization(t *testing.T) {
 	registry := newTestRegistry()
 
 	t.Run("Register with custom serialization", func(t *testing.T) {
-		typ := reflect.TypeOf(TestState{})
+		typ := reflect.TypeFor[TestState]()
 
 		marshalFunc := func(v any) ([]byte, error) {
 			state := v.(TestState)
@@ -333,7 +332,7 @@ func TestTypeRegistry_StateMarshalerUnmarshaler(t *testing.T) {
 		registry := newTestRegistry()
 
 		// First register the type
-		typ := reflect.TypeOf(TestState{})
+		typ := reflect.TypeFor[TestState]()
 		registry.RegisterTypeInternal(typ, "TestState7")
 
 		// Then create the marshaler
@@ -362,7 +361,7 @@ func TestTypeRegistry_StateMarshalerUnmarshaler(t *testing.T) {
 		registry := newTestRegistry()
 
 		// First register the type
-		typ := reflect.TypeOf(TestState{})
+		typ := reflect.TypeFor[TestState]()
 		registry.RegisterTypeInternal(typ, "TestState8")
 
 		// Then create the unmarshaler
@@ -370,7 +369,7 @@ func TestTypeRegistry_StateMarshalerUnmarshaler(t *testing.T) {
 		assert.NotNil(t, unmarshaler)
 
 		wrapped := map[string]any{
-			"_type": "TestState8",
+			"_type":  "TestState8",
 			"_value": map[string]any{"name": "unmarshaler", "count": float64(2)},
 		}
 		jsonData, _ := json.Marshal(wrapped)
@@ -391,7 +390,7 @@ func TestCheckpointData(t *testing.T) {
 	registry := GlobalTypeRegistry()
 
 	t.Run("NewCheckpointData with registered type", func(t *testing.T) {
-		typ := reflect.TypeOf(TestState{})
+		typ := reflect.TypeFor[TestState]()
 		registry.RegisterTypeInternal(typ, "TestState9")
 
 		state := TestState{Name: "checkpoint", Count: 50}
@@ -461,7 +460,7 @@ func TestCheckpointData(t *testing.T) {
 	})
 
 	t.Run("CheckpointData ToValue with custom unmarshaler", func(t *testing.T) {
-		typ := reflect.TypeOf(CustomState{})
+		typ := reflect.TypeFor[CustomState]()
 
 		unmarshalFunc := func(data []byte) (any, error) {
 			var custom map[string]any
@@ -508,8 +507,7 @@ func TestRegisterTypeWithValue(t *testing.T) {
 	registry := newTestRegistry()
 
 	t.Run("RegisterTypeWithValue with struct value", func(t *testing.T) {
-		var state TestState
-		err := registry.RegisterTypeInternal(reflect.TypeOf(state), "TestState10")
+		err := registry.RegisterTypeInternal(reflect.TypeFor[TestState](), "TestState10")
 		assert.NoError(t, err)
 
 		// Verify it's registered
@@ -518,8 +516,7 @@ func TestRegisterTypeWithValue(t *testing.T) {
 	})
 
 	t.Run("RegisterTypeWithValue with pointer", func(t *testing.T) {
-		var state PointerState
-		err := registry.RegisterTypeInternal(reflect.TypeOf(&state), "PointerState2")
+		err := registry.RegisterTypeInternal(reflect.TypeFor[*PointerState](), "PointerState2")
 		assert.NoError(t, err)
 
 		// Verify it's registered

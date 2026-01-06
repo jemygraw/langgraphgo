@@ -77,7 +77,7 @@ func TestStructSchema_Update(t *testing.T) {
 		result, err := schema.Update(current, new)
 		assert.NoError(t, err)
 		// When MergeFunc is nil, Update returns the new value directly
-		assert.Equal(t, 0, result.Count)   // New value (0)
+		assert.Equal(t, 0, result.Count)    // New value (0)
 		assert.Equal(t, "new", result.Name) // New value
 	})
 }
@@ -170,7 +170,7 @@ func TestFieldMerger_Update(t *testing.T) {
 
 		result, err := fm.Update(current, new)
 		assert.NoError(t, err)
-		assert.Equal(t, 8, result.Count)        // Sum
+		assert.Equal(t, 8, result.Count)         // Sum
 		assert.Equal(t, "original", result.Name) // Keep current
 	})
 

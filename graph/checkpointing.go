@@ -210,6 +210,37 @@ func (cr *CheckpointableRunnable[S]) InvokeWithConfig(ctx context.Context, initi
 		}
 	}
 
+	// Auto-resume: if thread_id is provided, try to load the latest checkpoint
+	// and merge its state with the provided initialState (which may be just new input)
+	if threadID != "" {
+		// Only auto-resume if ResumeFrom is not explicitly set (manual control takes precedence)
+		if config == nil || config.ResumeFrom == nil {
+			if latestCP, err := cr.getLatestCheckpoint(ctx, threadID); err == nil && latestCP != nil {
+				// Found existing checkpoint - this is a resume
+				checkpointState, ok := latestCP.State.(S)
+				if ok {
+					// Merge checkpoint state with new input using Schema
+					initialState = cr.mergeStates(ctx, checkpointState, initialState)
+
+					// Check if the checkpoint is at END (completed execution)
+					// Note: NodeName is empty when checkpoint is created at END or via other means
+					if latestCP.NodeName == "" || latestCP.NodeName == END {
+						// Graph has completed - just return the merged state
+						// No need to re-execute anything
+						return initialState, nil
+					}
+
+					// For incomplete checkpoints (interrupted), set ResumeFrom to continue
+					// The graph will continue execution from the checkpoint node
+					if config == nil {
+						config = &Config{}
+					}
+					config.ResumeFrom = []string{latestCP.NodeName}
+				}
+			}
+		}
+	}
+
 	// Update checkpoint listener with thread_id
 	if cr.listener != nil {
 		cr.listener.threadID = threadID
@@ -238,6 +269,57 @@ type StateSnapshot struct {
 	Metadata  map[string]any
 	CreatedAt time.Time
 	ParentID  string
+}
+
+// getLatestCheckpoint retrieves the latest checkpoint for a given thread_id.
+// It first tries to use the optimized GetLatestByThread method, and falls back
+// to the List method for stores that don't implement it.
+func (cr *CheckpointableRunnable[S]) getLatestCheckpoint(ctx context.Context, threadID string) (*store.Checkpoint, error) {
+	// Try to use the optimized GetLatestByThread method first
+	if latestGetter, ok := cr.config.Store.(interface {
+		GetLatestByThread(ctx context.Context, threadID string) (*store.Checkpoint, error)
+	}); ok {
+		return latestGetter.GetLatestByThread(ctx, threadID)
+	}
+
+	// Fallback to List method for stores that don't implement GetLatestByThread
+	checkpoints, err := cr.config.Store.List(ctx, threadID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list checkpoints: %w", err)
+	}
+
+	if len(checkpoints) == 0 {
+		return nil, fmt.Errorf("no checkpoints found for thread %s", threadID)
+	}
+
+	// Get the latest checkpoint (highest version)
+	latest := checkpoints[0]
+	for _, cp := range checkpoints {
+		if cp.Version > latest.Version {
+			latest = cp
+		}
+	}
+
+	return latest, nil
+}
+
+// mergeStates merges the checkpoint state with new input using the graph's Schema.
+// If Schema is available, it uses Schema.Update which applies reducers for smart merging.
+// Otherwise, the input state takes precedence (replacement behavior).
+func (cr *CheckpointableRunnable[S]) mergeStates(ctx context.Context, checkpointState S, input S) S {
+	// If no Schema, input state replaces checkpoint state (fallback behavior)
+	if cr.runnable.graph == nil || cr.runnable.graph.Schema == nil {
+		return input
+	}
+
+	// Use Schema.Update to merge states with reducer logic
+	merged, err := cr.runnable.graph.Schema.Update(checkpointState, input)
+	if err != nil {
+		// On error, fall back to input state
+		return input
+	}
+
+	return merged
 }
 
 // GetState retrieves the state for the given config
@@ -490,4 +572,42 @@ func generateExecutionID() string {
 
 func generateCheckpointID() string {
 	return fmt.Sprintf("checkpoint_%s", uuid.New().String())
+}
+
+// WithThreadID creates a Config with the given thread_id set in the configurable map.
+// This is a convenience function for setting up checkpoint-based conversation resumption.
+//
+// Example:
+//
+//	result, err := runnable.Invoke(ctx, state, graph.WithThreadID("conversation-1"))
+func WithThreadID(threadID string) *Config {
+	return &Config{
+		Configurable: map[string]any{
+			"thread_id": threadID,
+		},
+	}
+}
+
+// WithInterruptBefore creates a Config with interrupt points set before specified nodes.
+//
+// Example:
+//
+//	config := graph.WithInterruptBefore("node1", "node2")
+//	result, err := runnable.Invoke(ctx, state, config)
+func WithInterruptBefore(nodes ...string) *Config {
+	return &Config{
+		InterruptBefore: nodes,
+	}
+}
+
+// WithInterruptAfter creates a Config with interrupt points set after specified nodes.
+//
+// Example:
+//
+//	config := graph.WithInterruptAfter("node1", "node2")
+//	result, err := runnable.Invoke(ctx, state, config)
+func WithInterruptAfter(nodes ...string) *Config {
+	return &Config{
+		InterruptAfter: nodes,
+	}
 }

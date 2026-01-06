@@ -10,17 +10,16 @@ import (
 // Mock implementations for testing
 
 type MockThoughtState struct {
-	hash     string
-	isValid  bool
-	isGoal   bool
-	desc     string
-	value    int
+	hash    string
+	isValid bool
+	isGoal  bool
+	desc    string
 }
 
-func (m *MockThoughtState) IsValid() bool { return m.isValid }
-func (m *MockThoughtState) IsGoal() bool   { return m.isGoal }
+func (m *MockThoughtState) IsValid() bool          { return m.isValid }
+func (m *MockThoughtState) IsGoal() bool           { return m.isGoal }
 func (m *MockThoughtState) GetDescription() string { return m.desc }
-func (m *MockThoughtState) Hash() string     { return m.hash }
+func (m *MockThoughtState) Hash() string           { return m.hash }
 
 type MockThoughtGenerator struct {
 	generateFunc func(ctx context.Context, current ThoughtState) ([]ThoughtState, error)
@@ -216,9 +215,9 @@ func TestTreeOfThoughtsAgentMap_Execution(t *testing.T) {
 func TestCreateTreeOfThoughtsAgent_Generic(t *testing.T) {
 	type TOTState struct {
 		ActivePaths map[string]*SearchPath `json:"active_paths"`
-		Solution    string                   `json:"solution"`
-		Visited     map[string]bool          `json:"visited"`
-		Iteration   int                      `json:"iteration"`
+		Solution    string                 `json:"solution"`
+		Visited     map[string]bool        `json:"visited"`
+		Iteration   int                    `json:"iteration"`
 	}
 
 	t.Run("Create generic agent with valid config", func(t *testing.T) {
@@ -291,9 +290,9 @@ func TestCreateTreeOfThoughtsAgent_Generic(t *testing.T) {
 
 	t.Run("Create generic agent with missing config", func(t *testing.T) {
 		tests := []struct {
-			name    string
-			config  TreeOfThoughtsConfig
-			errMsg  string
+			name   string
+			config TreeOfThoughtsConfig
+			errMsg string
 		}{
 			{
 				name: "missing generator",
@@ -345,9 +344,9 @@ func TestCreateTreeOfThoughtsAgent_Generic(t *testing.T) {
 func TestTreeOfThoughtsAgent_Generic_Execution(t *testing.T) {
 	type TOTState struct {
 		ActivePaths map[string]*SearchPath `json:"active_paths"`
-		Solution    string                   `json:"solution"`
-		Visited     map[string]bool          `json:"visited"`
-		Iteration   int                      `json:"iteration"`
+		Solution    string                 `json:"solution"`
+		Visited     map[string]bool        `json:"visited"`
+		Iteration   int                    `json:"iteration"`
 	}
 
 	t.Run("Execute generic agent", func(t *testing.T) {

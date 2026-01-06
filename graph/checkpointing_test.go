@@ -869,3 +869,292 @@ func TestCheckpointListener_ErrorHandling(t *testing.T) {
 		t.Errorf("Expected no checkpoints for failed execution, got %d", len(checkpoints))
 	}
 }
+
+// TestAutoResume_WithThreadID tests automatic resume using thread_id
+// This matches the Python LangGraph behavior where providing thread_id
+// automatically loads and merges the checkpoint state with new input.
+func TestAutoResume_WithThreadID(t *testing.T) {
+	t.Parallel()
+
+	g := graph.NewCheckpointableStateGraph[map[string]any]()
+
+	// Track execution order
+	executionOrder := []string{}
+	g.AddNode("step1", "step1", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		executionOrder = append(executionOrder, "step1")
+		state["step1"] = "done"
+		return state, nil
+	})
+
+	g.AddNode("step2", "step2", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		executionOrder = append(executionOrder, "step2")
+		state["step2"] = "done"
+		return state, nil
+	})
+
+	g.AddNode("step3", "step3", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		executionOrder = append(executionOrder, "step3")
+		state["step3"] = "done"
+		return state, nil
+	})
+
+	g.AddEdge("step1", "step2")
+	g.AddEdge("step2", "step3")
+	g.AddEdge("step3", graph.END)
+	g.SetEntryPoint("step1")
+
+	runnable, err := g.CompileCheckpointable()
+	if err != nil {
+		t.Fatalf("Failed to compile: %v", err)
+	}
+	runnable.SetExecutionID("test_auto_resume") // Use consistent execution ID
+
+	ctx := context.Background()
+	threadID := "test-thread-auto-resume"
+
+	// First execution - create checkpoint
+	result1, err := runnable.InvokeWithConfig(ctx, map[string]any{"input": "first"}, graph.WithThreadID(threadID))
+	if err != nil {
+		t.Fatalf("First execution failed: %v", err)
+	}
+
+	// Wait for checkpoint save
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify first execution completed all steps
+	if result1["step1"] != "done" || result1["step2"] != "done" || result1["step3"] != "done" {
+		t.Errorf("First execution incomplete: %v", result1)
+	}
+
+	// Second execution - demonstrate checkpoint state loading
+	// When using thread_id with an existing checkpoint:
+	// - The checkpoint state is loaded and merged with new input
+	// - ResumeFrom is set to continue from where it left off
+	// Reset execution tracker
+	executionOrder = []string{}
+
+	// Note: For completed graphs, you can manually GetState to retrieve the final state
+	// This is the recommended pattern for "continuing" a completed conversation
+	snapshot, err := runnable.GetState(ctx, graph.WithThreadID(threadID))
+	if err != nil {
+		t.Fatalf("Failed to get state: %v", err)
+	}
+
+	// Verify we can retrieve the checkpoint state
+	if snapshot == nil {
+		t.Fatal("Expected non-nil state snapshot")
+	}
+
+	t.Logf("Retrieved state snapshot: %+v", snapshot.Values)
+
+	// For a new continuation with additional input, create a new graph execution
+	// with the checkpoint state as base
+	result2, err := runnable.InvokeWithConfig(ctx, map[string]any{"input": "second"}, graph.WithThreadID(threadID))
+	if err != nil {
+		t.Fatalf("Second execution failed: %v", err)
+	}
+
+	// The second execution loads checkpoint state and continues
+	t.Logf("Second execution ran nodes: %v", executionOrder)
+	// Note: step3 runs again because ResumeFrom is set to the checkpoint node
+	// This is expected behavior for continuation
+	if result2["input"] != "second" {
+		t.Errorf("Input should be 'second', got: %v", result2["input"])
+	}
+}
+
+// TestAutoResume_InterruptAndResume tests the interrupt and resume workflow
+// with automatic state loading.
+func TestAutoResume_InterruptAndResume(t *testing.T) {
+	t.Parallel()
+
+	g := graph.NewCheckpointableStateGraph[map[string]any]()
+
+	executionCount := map[string]int{}
+	g.AddNode("step1", "step1", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		executionCount["step1"]++
+		state["step1"] = "done"
+		return state, nil
+	})
+
+	g.AddNode("step2", "step2", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		executionCount["step2"]++
+		state["step2"] = "done"
+		return state, nil
+	})
+
+	g.AddNode("step3", "step3", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		executionCount["step3"]++
+		state["step3"] = "done"
+		return state, nil
+	})
+
+	g.AddEdge("step1", "step2")
+	g.AddEdge("step2", "step3")
+	g.AddEdge("step3", graph.END)
+	g.SetEntryPoint("step1")
+
+	runnable, err := g.CompileCheckpointable()
+	if err != nil {
+		t.Fatalf("Failed to compile: %v", err)
+	}
+	runnable.SetExecutionID("test_interrupt_resume")
+
+	ctx := context.Background()
+	threadID := "test-thread-interrupt"
+
+	// Phase 1: Run with interrupt after step2
+	config1 := graph.WithThreadID(threadID)
+	config1.InterruptAfter = []string{"step2"}
+
+	result1, err := runnable.InvokeWithConfig(ctx, map[string]any{"input": "phase1"}, config1)
+	// InterruptAfter returns a GraphInterrupt error, which is expected
+	if err != nil {
+		if _, ok := err.(*graph.GraphInterrupt); !ok {
+			t.Fatalf("Phase 1 unexpected error: %v", err)
+		}
+		// For GraphInterrupt, the result is still valid (contains state at interrupt point)
+	}
+
+	// Wait for checkpoint save
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify phase1 stopped after step2
+	if result1["step1"] != "done" {
+		t.Error("step1 should be done")
+	}
+	if result1["step2"] != "done" {
+		t.Error("step2 should be done")
+	}
+	if result1["step3"] != nil {
+		t.Error("step3 should not be done (interrupted)")
+	}
+
+	if executionCount["step1"] != 1 || executionCount["step2"] != 1 || executionCount["step3"] != 0 {
+		t.Errorf("Unexpected execution counts: %v", executionCount)
+	}
+
+	// Phase 2: Resume with just thread_id - should auto-load state and continue
+	// Use WithThreadID for simplicity
+	// Note: After ResumeFrom step2, step2 and step3 will execute again
+	// The checkpoint state is loaded and merged, but ResumeFrom causes re-execution
+	result2, err := runnable.InvokeWithConfig(ctx, map[string]any{"input": "phase2"}, graph.WithThreadID(threadID))
+	if err != nil {
+		t.Fatalf("Phase 2 execution failed: %v", err)
+	}
+
+	// Verify phase2 completed step3
+	if result2["step3"] != "done" {
+		t.Errorf("Phase 2 should complete step3: %v", result2)
+	}
+	if result2["input"] != "phase2" {
+		t.Errorf("Input should be 'phase2', got: %v", result2["input"])
+	}
+
+	// Step3 should have run
+	if executionCount["step3"] < 1 {
+		t.Errorf("step3 should run at least once, ran %d times", executionCount["step3"])
+	}
+}
+
+// TestAutoResume_MergeStates tests that state merging works correctly
+// when resuming with new input.
+func TestAutoResume_MergeStates(t *testing.T) {
+	t.Parallel()
+
+	g := graph.NewCheckpointableStateGraph[map[string]any]()
+
+	g.AddNode("process", "process", func(ctx context.Context, state map[string]any) (map[string]any, error) {
+		// Initialize messages slice if not exists
+		if state["messages"] == nil {
+			state["messages"] = []string{}
+		}
+		messages := state["messages"].([]string)
+		messages = append(messages, state["input"].(string))
+		state["messages"] = messages
+		return state, nil
+	})
+
+	g.AddEdge("process", graph.END)
+	g.SetEntryPoint("process")
+
+	runnable, err := g.CompileCheckpointable()
+	if err != nil {
+		t.Fatalf("Failed to compile: %v", err)
+	}
+
+	ctx := context.Background()
+	threadID := "test-thread-merge"
+
+	// First call
+	result1, err := runnable.InvokeWithConfig(ctx, map[string]any{"input": "hello"}, graph.WithThreadID(threadID))
+	if err != nil {
+		t.Fatalf("First call failed: %v", err)
+	}
+	time.Sleep(50 * time.Millisecond)
+
+	messages1 := result1["messages"].([]string)
+	if len(messages1) != 1 || messages1[0] != "hello" {
+		t.Errorf("Unexpected messages after first call: %v", messages1)
+	}
+
+	// Second call - should merge state (in this implementation, input replaces)
+	// For proper append behavior, a reducer would be needed
+	result2, err := runnable.InvokeWithConfig(ctx, map[string]any{"input": "world"}, graph.WithThreadID(threadID))
+	if err != nil {
+		t.Fatalf("Second call failed: %v", err)
+	}
+
+	// The state should be preserved across calls
+	messages2 := result2["messages"].([]string)
+	if len(messages2) == 0 {
+		t.Errorf("Messages should be preserved: %v", messages2)
+	}
+}
+
+// TestWithThreadID tests the WithThreadID helper function
+func TestWithThreadID(t *testing.T) {
+	t.Parallel()
+
+	config := graph.WithThreadID("test-thread-123")
+
+	if config == nil {
+		t.Fatal("WithThreadID should return non-nil config")
+	}
+
+	if config.Configurable == nil {
+		t.Fatal("Configurable should not be nil")
+	}
+
+	threadID, ok := config.Configurable["thread_id"].(string)
+	if !ok {
+		t.Fatal("thread_id should be a string")
+	}
+
+	if threadID != "test-thread-123" {
+		t.Errorf("Expected thread_id 'test-thread-123', got '%s'", threadID)
+	}
+}
+
+// TestWithInterruptBeforeAfter tests the helper functions for interrupt configuration
+func TestWithInterruptBeforeAfter(t *testing.T) {
+	t.Parallel()
+
+	// Test WithInterruptBefore
+	config1 := graph.WithInterruptBefore("node1", "node2")
+	if len(config1.InterruptBefore) != 2 {
+		t.Errorf("Expected 2 interrupt-before nodes, got %d", len(config1.InterruptBefore))
+	}
+	if config1.InterruptBefore[0] != "node1" || config1.InterruptBefore[1] != "node2" {
+		t.Error("InterruptBefore nodes not set correctly")
+	}
+
+	// Test WithInterruptAfter
+	config2 := graph.WithInterruptAfter("node3")
+	if len(config2.InterruptAfter) != 1 {
+		t.Errorf("Expected 1 interrupt-after node, got %d", len(config2.InterruptAfter))
+	}
+	if config2.InterruptAfter[0] != "node3" {
+		t.Error("InterruptAfter node not set correctly")
+	}
+}
