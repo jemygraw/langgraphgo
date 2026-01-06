@@ -3,6 +3,7 @@ package graph_test
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -1156,5 +1157,137 @@ func TestWithInterruptBeforeAfter(t *testing.T) {
 	}
 	if config2.InterruptAfter[0] != "node3" {
 		t.Error("InterruptAfter node not set correctly")
+	}
+}
+
+// TestMaxCheckpoints_AutoCleanup tests that MaxCheckpoints automatically
+// removes old checkpoints when the limit is exceeded.
+func TestMaxCheckpoints_AutoCleanup(t *testing.T) {
+	t.Parallel()
+
+	store := graph.NewMemoryCheckpointStore()
+	g := graph.NewCheckpointableStateGraph[map[string]any]()
+
+	// Add multiple nodes to create multiple checkpoints
+	for i := 1; i <= 5; i++ {
+		nodeName := fmt.Sprintf("step%d", i)
+		g.AddNode(nodeName, nodeName, func(ctx context.Context, state map[string]any) (map[string]any, error) {
+			state[nodeName] = "done"
+			return state, nil
+		})
+
+		if i > 1 {
+			prevNode := fmt.Sprintf("step%d", i-1)
+			g.AddEdge(prevNode, nodeName)
+		}
+	}
+	g.AddEdge("step5", graph.END)
+	g.SetEntryPoint("step1")
+
+	// Set MaxCheckpoints to 3
+	config := graph.CheckpointConfig{
+		Store:          store,
+		AutoSave:       true,
+		MaxCheckpoints: 3,
+	}
+	g.SetCheckpointConfig(config)
+
+	runnable, err := g.CompileCheckpointable()
+	if err != nil {
+		t.Fatalf("Failed to compile: %v", err)
+	}
+
+	ctx := context.Background()
+	threadID := "test-max-checkpoints"
+
+	// Execute the graph with thread_id
+	_, err = runnable.InvokeWithConfig(ctx, map[string]any{"input": "test"}, graph.WithThreadID(threadID))
+	if err != nil {
+		t.Fatalf("Execution failed: %v", err)
+	}
+
+	// Wait for async checkpoint operations
+	time.Sleep(100 * time.Millisecond)
+
+	// Check that only 3 checkpoints remain (most recent ones)
+	checkpoints, err := store.List(ctx, threadID)
+	if err != nil {
+		t.Fatalf("Failed to list checkpoints: %v", err)
+	}
+
+	if len(checkpoints) != 3 {
+		t.Errorf("Expected 3 checkpoints after MaxCheckpoints cleanup, got %d", len(checkpoints))
+	}
+
+	// Verify that the remaining checkpoints are the most recent ones (step3, step4, step5)
+	nodeNames := make([]string, 0, len(checkpoints))
+	for _, cp := range checkpoints {
+		nodeNames = append(nodeNames, cp.NodeName)
+	}
+
+	// Should contain step3, step4, step5 (the 3 most recent)
+	expectedNodes := []string{"step3", "step4", "step5"}
+	for _, expected := range expectedNodes {
+		found := slices.Contains(nodeNames, expected)
+		if !found {
+			t.Errorf("Expected checkpoint for %s, but only found: %v", expected, nodeNames)
+		}
+	}
+}
+
+// TestMaxCheckpoints_ZeroOrNegative tests that MaxCheckpoints <= 0 means no limit
+func TestMaxCheckpoints_ZeroOrNegative(t *testing.T) {
+	t.Parallel()
+
+	store := graph.NewMemoryCheckpointStore()
+	g := graph.NewCheckpointableStateGraph[map[string]any]()
+
+	// Add 3 nodes
+	for i := 1; i <= 3; i++ {
+		nodeName := fmt.Sprintf("step%d", i)
+		g.AddNode(nodeName, nodeName, func(ctx context.Context, state map[string]any) (map[string]any, error) {
+			state[nodeName] = "done"
+			return state, nil
+		})
+
+		if i > 1 {
+			prevNode := fmt.Sprintf("step%d", i-1)
+			g.AddEdge(prevNode, nodeName)
+		}
+	}
+	g.AddEdge("step3", graph.END)
+	g.SetEntryPoint("step1")
+
+	// Set MaxCheckpoints to 0 (no limit)
+	config := graph.CheckpointConfig{
+		Store:          store,
+		AutoSave:       true,
+		MaxCheckpoints: 0,
+	}
+	g.SetCheckpointConfig(config)
+
+	runnable, err := g.CompileCheckpointable()
+	if err != nil {
+		t.Fatalf("Failed to compile: %v", err)
+	}
+
+	ctx := context.Background()
+	threadID := "test-no-limit"
+
+	_, err = runnable.InvokeWithConfig(ctx, map[string]any{}, graph.WithThreadID(threadID))
+	if err != nil {
+		t.Fatalf("Execution failed: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// All checkpoints should be preserved (no limit)
+	checkpoints, err := store.List(ctx, threadID)
+	if err != nil {
+		t.Fatalf("Failed to list checkpoints: %v", err)
+	}
+
+	if len(checkpoints) != 3 {
+		t.Errorf("Expected 3 checkpoints with MaxCheckpoints=0 (no limit), got %d", len(checkpoints))
 	}
 }

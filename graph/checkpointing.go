@@ -54,10 +54,11 @@ func DefaultCheckpointConfig() CheckpointConfig {
 
 // CheckpointListener automatically creates checkpoints during execution
 type CheckpointListener[S any] struct {
-	store       store.CheckpointStore
-	executionID string
-	threadID    string
-	autoSave    bool
+	store          store.CheckpointStore
+	executionID    string
+	threadID       string
+	autoSave       bool
+	maxCheckpoints int
 }
 
 // OnGraphStep is called after a step in the graph has completed and the state has been merged.
@@ -116,6 +117,35 @@ func (cl *CheckpointListener[S]) saveCheckpoint(ctx context.Context, nodeName st
 
 	// Save checkpoint synchronously
 	_ = cl.store.Save(ctx, checkpoint)
+
+	// Cleanup old checkpoints if MaxCheckpoints is set
+	if cl.maxCheckpoints > 0 {
+		cl.cleanupOldCheckpoints(ctx)
+	}
+}
+
+// cleanupOldCheckpoints removes oldest checkpoints exceeding the max limit
+func (cl *CheckpointListener[S]) cleanupOldCheckpoints(ctx context.Context) {
+	// List checkpoints for this thread/execution
+	var checkpointID string
+	if cl.threadID != "" {
+		checkpointID = cl.threadID
+	} else {
+		checkpointID = cl.executionID
+	}
+
+	checkpoints, err := cl.store.List(ctx, checkpointID)
+	if err != nil || len(checkpoints) <= cl.maxCheckpoints {
+		return
+	}
+
+	// Sort by version ascending (oldest first) and delete excess
+	// Checkpoints returned by List are already sorted by version ascending
+	excessCount := len(checkpoints) - cl.maxCheckpoints
+	for i := range excessCount {
+		// Delete the oldest checkpoints
+		_ = cl.store.Delete(ctx, checkpoints[i].ID)
+	}
 }
 
 // CallbackHandler implementation for CheckpointListener is removed because CallbackHandler is untyped/legacy.
@@ -184,10 +214,11 @@ func NewCheckpointableRunnable[S any](runnable *ListenableRunnable[S], config Ch
 
 	// Create checkpoint listener
 	cr.listener = &CheckpointListener[S]{
-		store:       cr.config.Store,
-		executionID: executionID,
-		threadID:    "",
-		autoSave:    true,
+		store:          cr.config.Store,
+		executionID:    executionID,
+		threadID:       "",
+		autoSave:       true,
+		maxCheckpoints: cr.config.MaxCheckpoints,
 	}
 
 	// The listener will be added to config callbacks during invocation.
